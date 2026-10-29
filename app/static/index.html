@@ -1,0 +1,192 @@
+<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>hAI.3DDir</title>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
+<style>
+
+:root{--bg:#e8ecef;--p:#fff;--l:#d3dae0;--tx:#18222d;--m:#5f6b78;--ac:#0f6b80;--on:#fff;--in:#f4f6f8;--r:10px;--bgimg:none}
+[data-theme=nacht]{--bg:#0f1419;--p:#171e26;--l:#2a3441;--tx:#e6edf3;--m:#8d9aab;--ac:#3fb7d4;--on:#06222b;--in:#1d2530;color-scheme:dark}
+[data-theme=bunt]{--bg:#fff1d6;--p:#fff;--l:#ffc8a2;--tx:#2b2140;--m:#7d6b9c;--ac:#ff4f8b;--on:#fff;--in:#fff8ee;--r:20px;--bgimg:radial-gradient(circle at 12% 18%,#ff4f8b33 0 90px,#0000 91px),radial-gradient(circle at 88% 30%,#22c1c333 0 130px,#0000 131px),radial-gradient(circle at 40% 92%,#ffc20e44 0 110px,#0000 111px)}
+[data-theme=werkstatt]{--bg:#d9d6cf;--p:#f5f3ee;--l:#b9b4a8;--tx:#2a2a28;--m:#6b665c;--ac:#e8590c;--on:#fff;--in:#ebe8e1;--r:4px;--bgimg:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Ctext x='12' y='50' font-size='30' opacity='.14'%3E🛠️%3C/text%3E%3Ctext x='80' y='115' font-size='26' opacity='.14'%3E⚙️%3C/text%3E%3C/svg%3E")}
+[data-theme=galaxie]{--bg:#120d2b;--p:#1c1542;--l:#352a73;--tx:#ece8ff;--m:#a79fd6;--ac:#b388ff;--on:#1a0b3d;--in:#241b57;--r:16px;color-scheme:dark;--bgs:200px 120px;--bgimg:radial-gradient(1.5px 1.5px at 20px 30px,#fff9 50%,#0000 51%),radial-gradient(1px 1px at 90px 80px,#fff7 50%,#0000 51%),radial-gradient(2px 2px at 150px 20px,#c9b3ff99 50%,#0000 51%)}
+*{box-sizing:border-box}body{margin:0;background-color:var(--bg);background-image:var(--bgimg);background-size:var(--bgs,auto);background-attachment:fixed;color:var(--tx);font:15px/1.5 "Segoe UI",system-ui,sans-serif}
+button,input,select,textarea{font:inherit;color:inherit;background:var(--in);border:1px solid var(--l);border-radius:6px;padding:7px 12px}
+button{cursor:pointer}button:hover{border-color:var(--ac)}button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--ac);outline-offset:1px}
+button.pri{background:var(--ac);color:var(--on);border-color:var(--ac);font-weight:600}
+header{display:flex;align-items:center;gap:24px;padding:10px 24px;background:var(--p);border-bottom:1px solid var(--l);position:sticky;top:0;z-index:5}
+.logo{font-weight:800;font-size:19px;letter-spacing:-.5px;margin:0}.logo b{color:var(--ac)}
+nav{display:flex;gap:4px;flex:1}nav button{border:0;background:none;color:var(--m)}nav button.on{color:var(--ac);font-weight:600;background:color-mix(in srgb,var(--ac) 16%,transparent)}
+main{max-width:1180px;margin:0 auto;padding:24px}
+.bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:16px}.sp{flex:1}
+.crumbs a{color:var(--m);cursor:pointer}.crumbs a:hover{color:var(--ac)}.crumbs a:last-child{color:var(--tx);font-weight:600}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(172px,1fr));gap:10px;min-height:200px}
+.card{background:var(--p);border:1px solid var(--l);border-radius:var(--r);padding:14px;cursor:pointer;position:relative}
+.card:hover{border-color:var(--ac)}.ic{font-size:30px;height:42px}.nm{word-break:break-all;font-weight:600;font-size:13px}.sz{color:var(--m);font-size:12px}
+.acts{position:absolute;top:6px;right:6px;display:none;gap:2px}.card:hover .acts,.card:focus-within .acts{display:flex}.acts button{padding:1px 7px;background:var(--p)}
+.drop{outline:2px dashed var(--ac);outline-offset:6px}.empty{color:var(--m);padding:40px 0}
+table{width:100%;border-collapse:collapse;background:var(--p);border:1px solid var(--l);border-radius:var(--r)}td,th{padding:10px 12px;border-bottom:1px solid var(--l);text-align:left}th{color:var(--m);font-weight:500;font-size:13px}
+.spool{display:inline-block;width:34px;height:34px;border-radius:50%;vertical-align:middle;box-shadow:inset 0 0 0 2px #0002;background:radial-gradient(circle,var(--p) 0 17%,#0003 18% 21%,var(--c) 22%)}
+.meter{height:6px;background:var(--l);border-radius:3px;width:130px;margin-bottom:3px}.meter i{display:block;height:100%;background:var(--ac);border-radius:3px}
+dialog{background:var(--p);color:var(--tx);border:1px solid var(--l);border-radius:12px;padding:20px}dialog::backdrop{background:#0008}
+.f{display:grid;gap:10px;width:min(340px,80vw)}.f label{display:grid;gap:3px;color:var(--m);font-size:13px}.f input[type=color]{height:38px;padding:2px}
+.box{background:var(--p);border:1px solid var(--l);border-radius:var(--r);padding:20px;max-width:420px;margin-bottom:16px}
+#login{max-width:320px;margin:18vh auto;text-align:center}
+#toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--tx);color:var(--bg);padding:10px 18px;border-radius:8px;z-index:20}
+#prog{height:3px;background:var(--ac);width:0;position:fixed;top:0;left:0;z-index:30}
+[hidden]{display:none!important}
+.ck{display:none;position:absolute;top:8px;left:8px;width:20px;height:20px;border:2px solid var(--ac);border-radius:50%;background:var(--p)}
+.sel .ck{display:block}.sel .ic,.sel .nm,.sel .sz{margin-left:4px}.card.on{border-color:var(--ac);box-shadow:0 0 0 2px var(--ac)}.card.on .ck{background:var(--ac)}
+#sb{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);display:flex;gap:8px;align-items:center;background:var(--p);border:1px solid var(--ac);border-radius:var(--r);padding:8px 12px;z-index:9;box-shadow:0 6px 24px #0005}
+#q{min-width:0;flex:1 1 160px}#th{padding:6px 8px}
+.st{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:16px}.st div{background:var(--p);border:1px solid var(--l);border-radius:var(--r);padding:10px;color:var(--m)}.st b{display:block;font-size:20px;color:var(--tx)}
+#pl{display:grid;gap:6px;max-height:50vh;overflow:auto;margin:10px 0}#pl button{text-align:left}
+@media(max-width:700px){
+header{padding:8px 12px;gap:10px}header .logo{flex:1}
+nav{position:fixed;bottom:0;left:0;right:0;background:var(--p);border-top:1px solid var(--l);padding:6px;z-index:8;justify-content:space-around}nav button{flex:1;padding:10px 4px;font-size:13px}
+main{padding:12px 12px 90px}.grid{grid-template-columns:repeat(2,1fr)}.acts{display:flex}
+button,input,select{min-height:42px}#sb{bottom:70px;width:calc(100% - 24px);flex-wrap:wrap;justify-content:center}
+table,thead,tbody,tr,td{display:block}thead{display:none}tr{background:var(--p);border:1px solid var(--l);border-radius:var(--r);margin-bottom:10px;padding:8px}td{border:0;padding:4px 6px}
+.bar>*{flex:1 1 auto}.crumbs{flex-basis:100%}}
+.ic[data-t]{height:100px;display:flex;align-items:center;justify-content:center}.ic img{width:100%;height:100%;object-fit:contain}
+</style></head><body>
+<div id="prog"></div><div id="toast" hidden></div>
+<section id="login"><h1 class="logo" style="font-size:30px;margin-bottom:20px">hAI.<b>3DDir</b></h1>
+<form id="lf" class="f" style="width:100%"><input id="pw" type="password" placeholder="Passwort" autocomplete="current-password" required><button class="pri">Anmelden</button></form></section>
+<div id="app" hidden>
+<header><h1 class="logo">hAI.<b>3DDir</b></h1><nav><button data-t="files" class="on">Dateien</button><button data-t="fil">Filamente</button><button data-t="trash">Papierkorb</button><button data-t="adm">Admin</button></nav><select id="th" aria-label="Theme"></select><button id="lo">Abmelden</button></header>
+<main>
+<section id="t-files"><div class="bar"><div class="crumbs" id="cr"></div><span class="sp"></span><input id="q" type="search" placeholder="Suchen…"><button id="sm">Auswählen</button><button id="nf">Neuer Ordner</button><button class="pri" id="ub">Hochladen</button><input id="fi" type="file" multiple hidden></div>
+<div class="grid" id="gr"></div></section>
+<section id="t-fil" hidden><div class="bar"><b id="fs"></b><span class="sp"></span><button id="fa" class="pri">Neue Rolle</button><a href="/api/filaments/export?fmt=csv"><button>Export CSV</button></a><a href="/api/filaments/export?fmt=json"><button>Export JSON</button></a><button id="ib">Import</button><input id="ii" type="file" accept=".csv,.json" hidden></div>
+<table><thead><tr><th></th><th>Marke</th><th>Material</th><th>Farbe</th><th>Rest / Gesamt</th><th></th></tr></thead><tbody id="ft"></tbody></table></section>
+<section id="t-trash" hidden><div class="bar"><b>Papierkorb</b><span class="sp"></span><button id="te">Papierkorb leeren</button></div><table><thead><tr><th>Name</th><th>Ursprung</th><th>Gelöscht</th><th></th></tr></thead><tbody id="tl"></tbody></table></section>
+<section id="t-adm" hidden><div class="st" id="as"></div>
+<form class="box f" id="sf" style="width:auto"><b>Allgemein</b><label>Titel<input id="a_ti"></label><label>Standard-Theme<select id="a_th"></select></label>
+<b>Upload</b><label>Maximale Dateigröße (MB)<input id="a_mb" type="number" min="1" required></label><label>Erlaubte Endungen (kommagetrennt, leer = alle)<input id="a_ext"></label><label>3D-Thumbnails bis Dateigröße (MB, 0 = aus)<input id="a_tm" type="number" min="0"></label>
+<b>Papierkorb</b><label><span><input id="a_tr" type="checkbox"> Gelöschtes zuerst in den Papierkorb verschieben</span></label><label>Automatisch leeren nach (Tagen, 0 = nie)<input id="a_td" type="number" min="0"></label>
+<b>Telegram</b><small id="tgs"></small><label><span><input id="a_nl" type="checkbox"> Warnen bei wenig Filament</span></label><label>Warnschwelle (g Restgewicht)<input id="a_tl" type="number" min="0"></label><label><span><input id="a_nu" type="checkbox"> Uploads melden</span></label><button type="button" id="tgt">Testnachricht senden</button><button class="pri">Einstellungen speichern</button></form>
+<form class="box f" id="pf" style="width:auto"><b>Passwort</b><label>Neues Passwort (min. 6 Zeichen)<input id="a_pw" type="password" minlength="6" required autocomplete="new-password"></label><button class="pri">Passwort ändern</button></form></section>
+</main></div>
+<dialog id="vm"><div class="bar"><b id="vt"></b><span class="sp"></span><small id="vi"></small><button id="vc">Schließen</button></div><div id="vv" style="width:min(900px,84vw);height:60vh;background:var(--in);border-radius:8px"></div></dialog>
+<dialog id="fm"><form id="ff" class="f"><b id="fh"></b>
+<label>Marke<input id="f_brand"></label><label>Material<input id="f_material" list="mats" required></label>
+<datalist id="mats"><option>PLA<option>PLA+<option>PLA Silk<option>PLA Matte<option>PETG<option>TPU<option>ABS<option>ASA<option>PA<option>PC</datalist>
+<label>Farbname<input id="f_color_name"></label><label>Farbe<input id="f_color_hex" type="color"></label>
+<label>Gewicht gesamt (g)<input id="f_weight_total" type="number" min="0" step="any"></label><label>Gewicht Rest (g)<input id="f_weight_remaining" type="number" min="0" step="any"></label>
+<label>Notizen<input id="f_notes"></label><div class="bar"><button class="pri">Speichern</button><button type="button" id="fx">Abbrechen</button></div></form></dialog>
+<div id="sb" hidden><b id="sc"></b><button id="bm">Verschieben</button><button id="bz">Als ZIP</button><button id="bd">Löschen</button></div>
+<dialog id="pm"><div class="f"><b>Zielordner wählen</b><small id="pt"></small><div id="pl"></div><div class="bar"><button class="pri" id="pg">Hierher verschieben</button><button id="px">Abbrechen</button></div></div></dialog>
+<script type="module">
+const $=s=>document.querySelector(s),esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const J=(m,b)=>({method:m,headers:{"Content-Type":"application/json"},body:JSON.stringify(b)});
+const detail=async r=>{try{return(await r.json()).detail}catch{return r.statusText}};
+async function api(u,o={}){const r=await fetch("/api"+u,o);if(r.status===401&&u!=="/login"){showLogin();throw 0}if(!r.ok)throw new Error(await detail(r));return r.headers.get("content-type")?.includes("json")?r.json():r}
+let tt;function toast(m){const t=$("#toast");t.textContent=m;t.hidden=false;clearTimeout(tt);tt=setTimeout(()=>t.hidden=true,3500)}
+const run=f=>async(...a)=>{try{await f(...a)}catch(e){if(e)toast(e.message)}};
+const showLogin=()=>{$("#login").hidden=false;$("#app").hidden=true};
+const start=()=>{$("#login").hidden=true;$("#app").hidden=false;go("files")};
+$("#lf").onsubmit=run(async e=>{e.preventDefault();await api("/login",J("POST",{password:$("#pw").value}));$("#pw").value="";start()});
+$("#lo").onclick=run(async()=>{await api("/logout",{method:"POST"});showLogin()});
+function go(t){document.querySelectorAll("main>section").forEach(s=>s.hidden=s.id!=="t-"+t);document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("on",b.dataset.t===t));({files:()=>ld(),fil:loadFil,trash:loadTrash,adm:loadAdm})[t]()}
+document.querySelectorAll("nav button").forEach(b=>b.onclick=run(()=>go(b.dataset.t)));
+// ---- Themes ----
+const TH={modern:{n:"Modern",e:["📁","🧊","📄"]},nacht:{n:"Nacht",e:["📁","🧊","📄"]},bunt:{n:"Bunt",e:["🌈","🦄","🎈"]},werkstatt:{n:"Werkstatt",e:["🧰","⚙️","📎"]},galaxie:{n:"Galaxie",e:["🪐","🛸","⭐"]}};
+const THO=Object.entries(TH).map(([k,v])=>`<option value="${k}">${v.n}</option>`).join("");$("#th").innerHTML=THO;$("#a_th").innerHTML=THO;
+let theme="modern",ITEMS=null,CFG={thumb_max_mb:20};
+function setTheme(t){if(!TH[t])t="modern";theme=t;document.documentElement.dataset.theme=t;localStorage.setItem("hai-theme",t);$("#th").value=t;if(ITEMS)draw()}
+$("#th").onchange=()=>setTheme($("#th").value);
+// ---- Dateien ----
+let cwd="",SRCH=false,sel=new Set(),selMode=false;
+const j=n=>cwd?cwd+"/"+n:n,is3d=n=>/\.(stl|3mf|obj)$/i.test(n),dl=p=>location.href="/api/file?dl=1&path="+encodeURIComponent(p);
+const fmt=b=>b>1e9?(b/1e9).toFixed(1)+" GB":b>1e6?(b/1e6).toFixed(1)+" MB":b>1e3?Math.round(b/1e3)+" KB":b+" B";
+const tn=i=>!i.dir&&is3d(i.name)&&CFG.thumb_max_mb>0&&i.size<=CFG.thumb_max_mb*1e6?" data-t=1":"";
+const refresh=()=>SRCH?doSearch():ld();
+async function ld(p=cwd){$("#q").value="";SRCH=false;sel.clear();const d=await api("/list?path="+encodeURIComponent(p));cwd=d.path;ITEMS=d.items.map(i=>({...i,path:j(i.name)}));draw()}
+function draw(){const E=TH[theme].e,parts=cwd.split("/").filter(Boolean);
+ $("#cr").innerHTML=SRCH?"Suchergebnisse":[`<a data-p="">Share</a>`,...parts.map((x,i)=>`<a data-p="${esc(parts.slice(0,i+1).join("/"))}">${esc(x)}</a>`)].join(" / ");
+ $("#gr").classList.toggle("sel",selMode);
+ $("#gr").innerHTML=ITEMS.map(i=>`<div class="card${sel.has(i.path)?" on":""}" tabindex="0" draggable="true" data-p="${esc(i.path)}" data-n="${esc(i.name)}" data-d="${i.dir?1:0}"><span class="ck"></span><div class="ic"${tn(i)}>${E[i.dir?0:is3d(i.name)?1:2]}</div><div class="nm">${esc(i.name)}</div><div class="sz">${SRCH?esc(i.path.split("/").slice(0,-1).join("/")||"Share"):i.dir?"Ordner":fmt(i.size)}</div><div class="acts">${i.dir?"":'<button data-a="dl" title="Herunterladen">⬇</button>'}<button data-a="rn" title="Umbenennen">✎</button><button data-a="rm" title="Löschen">✕</button></div></div>`).join("")||'<div class="empty">Nichts gefunden. Ziehe Dateien hierher oder klicke auf Hochladen.</div>';
+ $("#gr").querySelectorAll(".ic[data-t]").forEach(el=>io.observe(el));
+ $("#sb").hidden=!sel.size;$("#sc").textContent=sel.size+" ausgewählt"}
+$("#cr").onclick=run(e=>{if(e.target.dataset.p!==undefined)return ld(e.target.dataset.p)});
+$("#gr").onclick=run(async e=>{const c=e.target.closest(".card");if(!c)return;const{p,n}=c.dataset,a=e.target.dataset.a;
+ if(a==="dl")return dl(p);
+ if(a==="rn"){const x=prompt("Neuer Name",n);if(x&&x!==n){await api("/rename",J("POST",{path:p,name:x}));refresh()}return}
+ if(a==="rm"){if(confirm(`„${n}“ löschen?`)){await api("/delete",J("POST",{path:p}));refresh()}return}
+ if(selMode||e.target.classList.contains("ck")){sel.has(p)?sel.delete(p):sel.add(p);return draw()}
+ if(c.dataset.d==="1")return ld(p);if(is3d(n))return view(p,n);dl(p)});
+let st;$("#q").oninput=()=>{clearTimeout(st);st=setTimeout(run(doSearch),300)};
+async function doSearch(){const q=$("#q").value.trim();if(q.length<2){if(SRCH)ld();return}SRCH=true;sel.clear();ITEMS=await api("/search?q="+encodeURIComponent(q));draw()}
+$("#sm").onclick=()=>{selMode=!selMode;if(!selMode)sel.clear();$("#sm").classList.toggle("pri",selMode);draw()};
+$("#bz").onclick=run(async()=>{const r=await api("/zip",J("POST",{paths:[...sel]})),u=URL.createObjectURL(await r.blob()),a=document.createElement("a");a.href=u;a.download="3DDir.zip";a.click();setTimeout(()=>URL.revokeObjectURL(u),6e4)});
+$("#bd").onclick=run(async()=>{if(!confirm(`${sel.size} Elemente löschen?`))return;for(const p of sel)await api("/delete",J("POST",{path:p}));sel.clear();refresh()});
+let pp="";async function pl(){const d=await api("/list?path="+encodeURIComponent(pp));pp=d.path;$("#pt").textContent="/"+pp;$("#pl").innerHTML=(pp?'<button data-u="1">⬆ Eine Ebene hoch</button>':"")+d.items.filter(i=>i.dir).map(i=>`<button data-f="${esc(i.name)}">${TH[theme].e[0]} ${esc(i.name)}</button>`).join("")}
+$("#bm").onclick=run(async()=>{pp=cwd;await pl();$("#pm").showModal()});$("#px").onclick=()=>$("#pm").close();
+$("#pl").onclick=run(async e=>{const d=e.target.dataset;if(d.u)pp=pp.split("/").slice(0,-1).join("/");else if(d.f)pp=pp?pp+"/"+d.f:d.f;else return;await pl()});
+$("#pg").onclick=run(async()=>{await api("/move",J("POST",{paths:[...sel],to:pp}));$("#pm").close();sel.clear();refresh()});
+$("#nf").onclick=run(async()=>{const n=prompt("Name des neuen Ordners");if(n){await api("/mkdir",J("POST",{path:cwd,name:n}));ld()}});
+$("#ub").onclick=()=>$("#fi").click();$("#fi").onchange=run(async e=>{await up(e.target.files);e.target.value=""});
+function up(files){return new Promise((ok,no)=>{const f=new FormData();[...files].forEach(x=>f.append("files",x));const x=new XMLHttpRequest();x.open("POST","/api/upload?path="+encodeURIComponent(cwd));
+ x.upload.onprogress=e=>$("#prog").style.width=e.loaded/e.total*100+"%";
+ x.onload=()=>{$("#prog").style.width="0";if(x.status<300){toast("Hochgeladen");ld();ok()}else{let m=x.statusText;try{m=JSON.parse(x.responseText).detail}catch{}no(new Error(m))}};
+ x.onerror=()=>{$("#prog").style.width="0";no(new Error("Netzwerkfehler"))};x.send(f)})}
+const gr=$("#t-files");$("#gr").ondragstart=e=>{const c=e.target.closest(".card");if(c)e.dataTransfer.setData("application/x-hai",c.dataset.p)};
+gr.ondragover=e=>{e.preventDefault();if(e.dataTransfer.types.includes("Files"))$("#gr").classList.add("drop")};gr.ondragleave=()=>$("#gr").classList.remove("drop");
+gr.ondrop=run(async e=>{e.preventDefault();$("#gr").classList.remove("drop");const m=e.dataTransfer.getData("application/x-hai"),c=e.target.closest('.card[data-d="1"]');
+ if(m){if(c&&c.dataset.p!==m){await api("/move",J("POST",{paths:[m],to:c.dataset.p}));refresh()}return}
+ if(e.dataTransfer.files.length)await up(e.dataTransfer.files)});
+// ---- 3D-Viewer ----
+let stop=()=>{};$("#vc").onclick=()=>$("#vm").close();$("#vm").onclose=()=>stop();
+async function parse(T,ext,buf,mat){let o;
+ if(ext==="stl"){const{STLLoader}=await import("three/addons/loaders/STLLoader.js");o=new T.Mesh(new STLLoader().parse(buf),mat)}
+ else if(ext==="obj"){const{OBJLoader}=await import("three/addons/loaders/OBJLoader.js");o=new OBJLoader().parse(new TextDecoder().decode(buf));o.traverse(m=>{if(m.isMesh){m.material=mat;m.geometry.computeVertexNormals()}})}
+ else{const{ThreeMFLoader}=await import("three/addons/loaders/3MFLoader.js");o=new ThreeMFLoader().parse(buf)}
+ return o}
+const view=run(async(path,name)=>{const ext=name.split(".").pop().toLowerCase(),box=$("#vv");$("#vt").textContent=name;$("#vi").textContent="Lade…";box.innerHTML="";$("#vm").showModal();
+ const T=await import("three"),{OrbitControls}=await import("three/addons/controls/OrbitControls.js");
+ const buf=await(await api("/file?path="+encodeURIComponent(path))).arrayBuffer();const mat=new T.MeshStandardMaterial({color:0x3d8fa5,roughness:.55,metalness:.1});const o=await parse(T,ext,buf,mat);
+ const b=new T.Box3().setFromObject(o),s=b.getSize(new T.Vector3());$("#vi").textContent=`${s.x.toFixed(1)} × ${s.y.toFixed(1)} × ${s.z.toFixed(1)} mm`;
+ const g=new T.Group();g.add(o);o.position.sub(b.getCenter(new T.Vector3()));g.rotation.x=-Math.PI/2;
+ const sc=new T.Scene();sc.background=new T.Color(getComputedStyle(box).backgroundColor);sc.add(g,new T.HemisphereLight(0xffffff,0x778899,1.3));const dl=new T.DirectionalLight(0xffffff,1.6);dl.position.set(1,2,1.5);sc.add(dl);
+ const r=new T.WebGLRenderer({antialias:true});r.setPixelRatio(devicePixelRatio);r.setSize(box.clientWidth,box.clientHeight);box.appendChild(r.domElement);
+ const cam=new T.PerspectiveCamera(40,box.clientWidth/box.clientHeight,.1,1e5),d=Math.max(s.x,s.y,s.z)*2;cam.position.set(d,d*.8,d);
+ const c=new OrbitControls(cam,r.domElement);c.enableDamping=true;let id,on=true;
+ const loop=()=>{if(!on)return;id=requestAnimationFrame(loop);c.update();r.render(sc,cam)};loop();
+ stop=()=>{on=false;cancelAnimationFrame(id);r.dispose();box.innerHTML=""}});
+// ---- Filamente ----
+const FK=["brand","material","color_name","color_hex","weight_total","weight_remaining","notes"];let FIL=[],eid=null;
+async function loadFil(){FIL=await api("/filaments");const kg=FIL.reduce((a,r)=>a+r.weight_remaining,0)/1000;$("#fs").textContent=`${FIL.length} Rollen, ${kg.toFixed(2)} kg Rest`;
+ $("#ft").innerHTML=FIL.map(r=>{const p=r.weight_total?Math.min(100,r.weight_remaining/r.weight_total*100):0;return`<tr><td><span class="spool" style="--c:${esc(r.color_hex)}"></span></td><td>${esc(r.brand)}</td><td>${esc(r.material)}</td><td>${esc(r.color_name)}</td><td><div class="meter"><i style="width:${p}%"></i></div>${r.weight_remaining} / ${r.weight_total} g</td><td><button data-e="${r.id}">Bearbeiten</button> <button data-x="${r.id}">Löschen</button></td></tr>`}).join("")||'<tr><td colspan="6" class="empty">Noch keine Rollen. Lege eine an oder importiere eine CSV- oder JSON-Datei.</td></tr>'}
+function fo(r){eid=r?.id||null;$("#fh").textContent=r?"Rolle bearbeiten":"Neue Rolle";const df={color_hex:"#0f6b80",weight_total:1000,weight_remaining:1000};FK.forEach(k=>$("#f_"+k).value=r?r[k]:df[k]??"");$("#fm").showModal()}
+$("#fa").onclick=()=>fo();$("#fx").onclick=()=>$("#fm").close();
+$("#ft").onclick=run(async e=>{const d=e.target.dataset;if(d.e)fo(FIL.find(r=>r.id===d.e));if(d.x&&confirm("Rolle löschen?")){await api("/filaments/"+d.x,{method:"DELETE"});loadFil()}});
+$("#ff").onsubmit=run(async e=>{e.preventDefault();const b=Object.fromEntries(FK.map(k=>[k,$("#f_"+k).value]));await api(eid?"/filaments/"+eid:"/filaments",J(eid?"PUT":"POST",b));$("#fm").close();loadFil()});
+$("#ib").onclick=()=>$("#ii").click();
+$("#ii").onchange=run(async e=>{const f=e.target.files[0];if(!f)return;const rp=FIL.length&&confirm("Bestehende Rollen ersetzen?\nOK = ersetzen, Abbrechen = anhängen")?1:0;const fd=new FormData();fd.append("file",f);
+ const r=await api("/filaments/import?replace="+rp,{method:"POST",body:fd});e.target.value="";toast(r.imported+" Rollen importiert");loadFil()});
+// ---- Thumbnails (im Browser gerendert, in IndexedDB gecacht) ----
+const idb=new Promise(ok=>{const q=indexedDB.open("hai-thumbs",1);q.onupgradeneeded=()=>q.result.createObjectStore("t");q.onsuccess=()=>ok(q.result);q.onerror=()=>ok(null)});
+const tget=async k=>{const d=await idb;return d?new Promise(ok=>{const q=d.transaction("t").objectStore("t").get(k);q.onsuccess=()=>ok(q.result);q.onerror=()=>ok(null)}):null};
+const tset=async(k,v)=>{const d=await idb;if(d)d.transaction("t","readwrite").objectStore("t").put(v,k)};
+let TR=null;
+async function thumb(path,mtime,size){const key=path+"|"+mtime+"|"+size,c=await tget(key);if(c)return c;const T=await import("three");
+ if(!TR){TR={r:new T.WebGLRenderer({antialias:true,alpha:true,preserveDrawingBuffer:true}),s:new T.Scene(),cam:new T.PerspectiveCamera(40,1,.1,1e5)};TR.r.setSize(160,160);TR.r.setClearColor(0,0);TR.s.add(new T.HemisphereLight(0xffffff,0x778899,1.3));const l=new T.DirectionalLight(0xffffff,1.6);l.position.set(1,2,1.5);TR.s.add(l)}
+ const buf=await(await api("/file?path="+encodeURIComponent(path))).arrayBuffer(),mat=new T.MeshStandardMaterial({color:0x3d8fa5,roughness:.55,metalness:.1}),o=await parse(T,path.split(".").pop().toLowerCase(),buf,mat);
+ const b=new T.Box3().setFromObject(o),s=b.getSize(new T.Vector3()),g=new T.Group();g.add(o);o.position.sub(b.getCenter(new T.Vector3()));g.rotation.x=-Math.PI/2;
+ const d=Math.max(s.x,s.y,s.z)*2;TR.cam.position.set(d,d*.8,d);TR.cam.lookAt(0,0,0);TR.s.add(g);TR.r.render(TR.s,TR.cam);
+ const url=TR.r.domElement.toDataURL("image/png");TR.s.remove(g);o.traverse(m=>m.geometry&&m.geometry.dispose());mat.dispose();await tset(key,url);return url}
+let TQ=Promise.resolve();
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(!e.isIntersecting)return;io.unobserve(e.target);const el=e.target;
+ TQ=TQ.then(async()=>{try{const i=ITEMS.find(x=>x.path===el.closest(".card").dataset.p);if(!i||!el.isConnected)return;el.innerHTML=`<img src="${await thumb(i.path,i.mtime,i.size)}" alt="">`}catch{}})}),{rootMargin:"120px"});
+// ---- Papierkorb ----
+async function loadTrash(){const l=await api("/trash");$("#tl").innerHTML=l.map(e=>`<tr><td>${esc(e.name)}</td><td>${esc(e.orig)}</td><td>${new Date(e.ts*1000).toLocaleDateString("de-DE")}</td><td><button data-r="${e.id}">Wiederherstellen</button> <button data-x="${e.id}">Endgültig löschen</button></td></tr>`).join("")||'<tr><td colspan="4" class="empty">Der Papierkorb ist leer.</td></tr>'}
+$("#tl").onclick=run(async e=>{const d=e.target.dataset;if(d.r)await api("/trash/restore",J("POST",{id:d.r}));else if(d.x&&confirm("Endgültig löschen?"))await api("/trash/purge",J("POST",{id:d.x}));else return;loadTrash()});
+$("#te").onclick=run(async()=>{if(confirm("Papierkorb leeren?")){await api("/trash/purge",J("POST",{id:""}));loadTrash()}});
+// ---- Admin ----
+async function loadAdm(){const s=await api("/settings"),t=await api("/stats");$("#a_ti").value=s.title;$("#a_th").value=s.default_theme;$("#a_mb").value=s.max_upload_mb;$("#a_ext").value=s.allowed_ext;$("#a_tm").value=s.thumb_max_mb;$("#a_tr").checked=s.trash_enabled;$("#a_td").value=s.trash_days;$("#a_nl").checked=s.tg_notify_low;$("#a_tl").value=s.tg_low_g;$("#a_nu").checked=s.tg_notify_upload;
+ const g=await api("/telegram");$("#tgs").textContent=g.enabled?`🟢 Bot aktiv${g.bot?" (@"+g.bot+")":""}, ${g.allowed} freigegebene ID(s)`:"⚪ Nicht aktiv: TELEGRAM_BOT_TOKEN und TELEGRAM_ALLOWED_IDS als ENV setzen";
+ $("#as").innerHTML=[["Dateien",t.files],["Belegt",fmt(t.bytes)],["Frei",fmt(t.free)],["Im Papierkorb",t.trash],["Filamente",t.filaments]].map(([k,v])=>`<div>${k}<b>${v}</b></div>`).join("")}
+$("#sf").onsubmit=run(async e=>{e.preventDefault();await api("/settings",J("PUT",{title:$("#a_ti").value,default_theme:$("#a_th").value,max_upload_mb:+$("#a_mb").value,allowed_ext:$("#a_ext").value,thumb_max_mb:+$("#a_tm").value,trash_enabled:$("#a_tr").checked,trash_days:+$("#a_td").value,tg_low_g:+$("#a_tl").value,tg_notify_low:$("#a_nl").checked,tg_notify_upload:$("#a_nu").checked}));CFG.thumb_max_mb=+$("#a_tm").value;toast("Gespeichert")});
+$("#tgt").onclick=run(async()=>{await api("/telegram/test",{method:"POST"});toast("Testnachricht gesendet")});
+$("#pf").onsubmit=run(async e=>{e.preventDefault();await api("/password",J("POST",{password:$("#a_pw").value}));$("#a_pw").value="";toast("Passwort geändert")});
+const cfg=await fetch("/api/config").then(r=>r.json()).catch(()=>({}));CFG={...CFG,...cfg};document.title=cfg.title||"hAI.3DDir";setTheme(localStorage.getItem("hai-theme")||cfg.default_theme);
+run(async()=>{(await api("/me")).auth?start():showLogin()})();
+</script></body></html>

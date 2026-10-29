@@ -1,0 +1,27 @@
+# Portainer-Stack: ENVs unter "Environment variables" eintragen
+services:
+  hai3ddir:
+    image: ghcr.io/jbkunama1/hai.3ddir:latest
+    container_name: hai3ddir
+    restart: unless-stopped
+    ports:
+      - "${PORT:-8080}:8080"
+    environment:
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      SECRET_KEY: ${SECRET_KEY}
+      MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-500}
+      PUID: ${PUID:-1000}
+      PGID: ${PGID:-1000}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_ALLOWED_IDS: ${TELEGRAM_ALLOWED_IDS:-}
+      TZ: ${TZ:-Europe/Berlin}
+    networks:
+      - highfishNetwork
+    volumes:
+      - ${SHARE_HOST_PATH}:/share        # Host-Pfad der Samba-Freigabe
+      - hai3ddir-data:/data              # Einstellungen + Filamentdaten
+volumes:
+  hai3ddir-data:
+networks:
+  highfishNetwork:
+    external: true
