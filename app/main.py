@@ -1,7 +1,7 @@
-import os, io, csv, json, time, uuid, hmac, hashlib, shutil, secrets
+import os, io, re, csv, json, time, uuid, hmac, hashlib, shutil, secrets, zipfile, tempfile, base64
 from pathlib import Path
 from fastapi import FastAPI, APIRouter, Depends, HTTPException, Request, UploadFile, File
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse, Response, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 from pydantic import BaseModel
@@ -16,9 +16,9 @@ if os.getuid() == 0:  # Rechte auf PUID/PGID absenken, damit Dateien auf dem Sha
     u, g = int(os.getenv("PUID", 1000)), int(os.getenv("PGID", 1000))
     os.chown(DATA, u, g); os.setgid(g); os.setuid(u)
 
-SF, FF = DATA / "settings.json", DATA / "filaments.json"
-PF, IMG = DATA / "prints.json", DATA / "img"; IMG.mkdir(exist_ok=True)
-FIELDS = ["brand", "material", "color_name", "color_hex", "weight_total", "weight_remaining", "notes", "barcode"]
+SF, FF, PF, TJ = DATA / "settings.json", DATA / "filaments.json", DATA / "prints.json", DATA / "trash.json"
+IMG = DATA / "img"; IMG.mkdir(exist_ok=True)
+FIELDS = ["brand", "material", "color_name", "color_hex", "weight_total", "weight_remaining", "notes", "barcode", "price_per_kg", "purchase_date"]
 
 def load(f, d):
     try: return json.loads(f.read_text("utf-8"))
@@ -26,7 +26,7 @@ def load(f, d):
 def save(f, v): f.write_text(json.dumps(v, ensure_ascii=False, indent=1), "utf-8")
 def settings():
     s = {"max_upload_mb": int(os.getenv("MAX_UPLOAD_MB", 500)),
-         "allowed_ext": os.getenv("ALLOWED_EXTENSIONS", "stl,3mf,obj,step,stp,gcode,zip,png,jpg,pdf,txt"), "pw_hash": None, "trash_enabled": True, "trash_days": 30, "default_theme": "modern", "title": "hAI.3DDir", "thumb_max_mb": 20, "tg_low_g": 100, "tg_notify_start": True, "tg_daily": True, "tg_daily_time": "08:00", "tg_daily_backup": False, "tg_notify_upload": True, "mcp_enabled": True, "folder_view": "links", "sort_by": "name", "sort_order": "asc"}
+         "allowed_ext": os.getenv("ALLOWED_EXTENSIONS", "stl,3mf,obj,step,stp,gcode,zip,png,jpg,pdf,txt"), "pw_hash": None, "trash_enabled": True, "trash_days": 30, "default_theme": "modern", "title": "hAI.3DDir", "thumb_max_mb": 20, "tg_low_g": 100, "tg_notify_start": True, "tg_daily": True, "tg_daily_time": "08:00", "tg_daily_backup": False, "tg_notify_upload": True, "mcp_enabled": True, "folder_view": "links", "sort_by": "name", "sort_order": "asc", "file_view": "icons"}
     s.update(load(SF, {})); return s
 def hpw(pw, salt=None):
     salt = salt or secrets.token_hex(8)
@@ -48,6 +48,14 @@ def clean(n):
 app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
 app.add_middleware(SessionMiddleware, secret_key=os.getenv("SECRET_KEY") or secrets.token_hex(32),
                    max_age=7 * 86400, same_site="lax")
+@app.middleware("http")
+async def auth_middleware(request: Request, call_next):
+    if request.url.path.startswith("/api/") and not request.url.path.startswith("/api/config") and not request.url.path.startswith("/api/login") and not request.url.path.startswith("/api/logout") and not request.url.path.startswith("/api/health"):
+        session = request.session
+        if not session.get("ok"):
+            return JSONResponse({"error": "Nicht angemeldet"}, status_code=401)
+    response = await call_next(request)
+    return response
 def auth(r: Request):
     if not r.session.get("ok"): raise HTTPException(401, "Nicht angemeldet")
 A = APIRouter(prefix="/api")
@@ -135,6 +143,12 @@ def delete(b: P):
         d = p.is_dir(); shutil.move(str(p), str(td / p.name))
         save(TJ, load(TJ, []) + [{"id": i, "name": p.name, "orig": p.relative_to(ROOT).as_posix(), "dir": d, "ts": time.time()}])
     else: _rm(p)
+
+    def _rm(p):
+        if p.is_dir():
+            shutil.rmtree(p)
+        else:
+            p.unlink()
     return {"ok": True}
 
 # ---- Admin ----
@@ -158,6 +172,330 @@ def health(): return {"status": "ok"}
 def set_pw(b: PW):
     if len(b.password) < 6: raise HTTPException(400, "Mindestens 6 Zeichen")
     s = load(SF, {}); s["pw_hash"] = hpw(b.password); save(SF, s); return {"ok": True}
+
+# ---- Backup ----
+@A.post("/backup")
+def backup():
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".zip") as t:
+        with zipfile.ZipFile(t.name, 'w') as z:
+            z.write(SF, "settings.json")
+            z.write(FF, "filaments.json")
+            z.write(PF, "prints.json")
+            for f in IMG.glob("*"):
+                if f.is_file():
+                    z.write(f, f"img/{f.name}")
+    return FileResponse(t.name, media_type="application/zip", filename=f"hai3ddir_backup_{int(time.time())}.zip", background=lambda: os.unlink(t.name))
+
+@A.post("/restore")
+async def restore(file: UploadFile = File(...)):
+    if not file.filename.endswith('.zip'): raise HTTPException(400, "Nur ZIP-Dateien")
+    try:
+        with zipfile.ZipFile(file.file, 'r') as z:
+            if 'settings.json' in z.namelist(): z.extract('settings.json', DATA)
+            if 'filaments.json' in z.namelist(): z.extract('filaments.json', DATA)
+            if 'prints.json' in z.namelist(): z.extract('prints.json', DATA)
+            for nm in z.namelist():
+                if nm.startswith("img/") and not nm.endswith("/"):
+                    f = DATA / nm
+                    f.parent.mkdir(parents=True, exist_ok=True)
+                    with z.open(nm) as s, open(f, 'wb') as d: d.write(s.read())
+    except Exception as e: raise HTTPException(400, f"Fehler beim Wiederherstellen: {e}")
+    return {"ok": True}
+
+# ---- Admin ----
+KEYS = {"max_upload_mb": int, "allowed_ext": str, "trash_enabled": bool, "trash_days": int, "default_theme": str, "title": str, "thumb_max_mb": int, "tg_low_g": int, "tg_notify_start": bool, "tg_daily": bool, "tg_daily_time": str, "tg_daily_backup": bool, "tg_notify_upload": bool, "mcp_enabled": bool, "folder_view": str, "sort_by": str, "sort_order": str, "file_view": str}
+@R.get("/settings")
+def get_settings():
+    s = settings(); return {k: s[k] for k in KEYS}
+@R.put("/settings")
+def put_settings(b: dict):
+    s = load(SF, {})
+    for k, t in KEYS.items():
+        if k in b: s[k] = t(b[k])
+    save(SF, s); return {"ok": True}
+@A.get("/config")
+def config():
+    s = settings(); return {"title": s["title"], "default_theme": s["default_theme"], "thumb_max_mb": s["thumb_max_mb"], "folder_view": s["folder_view"], "sort_by": s["sort_by"], "sort_order": s["sort_order"], "file_view": s["file_view"]}
+
+# ---- AI-Scan ----
+@A.get("/ai")
+def ai_status():
+    return {"enabled": bool(os.getenv("LLM_BASE_URL")), "model": os.getenv("LLM_MODEL", "")}
+
+@R.post("/ai/label")
+async def ai_scan_label(file: UploadFile = File(...)):
+    try:
+        content = await file.read()
+        b64 = base64.b64encode(content).decode()
+        # TODO: Implement actual AI label scanning with extras.AI
+        return {"brand": "Unbekannt", "material": "PLA", "weight_total": 1000, "weight_remaining": 800}
+    except Exception as e:
+        raise HTTPException(400, f"AI-Scan fehlgeschlagen: {e}")
+
+# ---- Barcode ----
+@R.get("/filaments/barcode/{code}")
+def barcode_lookup(code: str):
+    filaments = load(FF, [])
+    for f in filaments:
+        if f.get("barcode") == code:
+            return f
+    return None
+
+# ---- MCP Server ----
+@app.get("/mcp")
+def mcp_info():
+    tokens = load(DATA / "mcp_tokens.json", [])
+    return {"tokens": tokens, "env": bool(os.getenv("MCP_TOKEN"))}
+
+@app.post("/mcp/tokens")
+def mcp_create_token(b: dict):
+    tokens = load(DATA / "mcp_tokens.json", [])
+    t = {
+        "id": secrets.token_hex(8),
+        "name": b["name"],
+        "token": secrets.token_urlsafe(32),
+        "read_only": b.get("read_only", False),
+        "created": time.time()
+    }
+    tokens.append(t)
+    save(DATA / "mcp_tokens.json", tokens)
+    return t
+
+@app.delete("/mcp/tokens/{token}")
+def mcp_delete_token(token: str):
+    tokens = load(DATA / "mcp_tokens.json", [])
+    tokens = [t for t in tokens if t["token"] != token and t["id"] != token]
+    save(DATA / "mcp_tokens.json", tokens)
+    return {"ok": True}
+
+# ---- Slicer Data ----
+@R.get("/slicer")
+async def get_slicer_data(path: str, v: str):
+    p = safe(path)
+    if not p.is_file(): raise HTTPException(404, "Datei nicht gefunden")
+    # TODO: Implement actual slicer data extraction
+    return {"has": True, "data": {"time_s": 3600, "grams": 120}, "image": None}
+
+@R.get("/slicer/image")
+def get_slicer_image(path: str, v: str):
+    p = safe(path)
+    if not p.is_file(): raise HTTPException(404, "Datei nicht gefunden")
+    # TODO: Generate thumbnail from file
+    return FileResponse(p, media_type="image/png")
+
+# ---- Filament Images ----
+@R.get("/filaments/{id}/image")
+def get_filament_image(id: str, v: str = "0"):
+    filaments = load(FF, [])
+    for f in filaments:
+        if f["id"] == id and f.get("image"):
+            img_path = IMG / f["image"]
+            if img_path.exists():
+                return FileResponse(img_path, media_type="image/jpeg")
+    raise HTTPException(404, "Bild nicht gefunden")
+
+@R.post("/filaments/{id}/image")
+async def upload_filament_image(id: str, file: UploadFile = File(...)):
+    filaments = load(FF, [])
+    for f in filaments:
+        if f["id"] == id:
+            filename = f"{id}-{int(time.time())}.jpg"
+            img_path = IMG / filename
+            content = await file.read()
+            img_path.write_bytes(content)
+            f["image"] = filename
+            f["img_ts"] = int(time.time())
+            save(FF, filaments)
+            return {"ok": True}
+    raise HTTPException(404, "Filament nicht gefunden")
+
+@R.delete("/filaments/{id}/image")
+def delete_filament_image(id: str):
+    filaments = load(FF, [])
+    for f in filaments:
+        if f["id"] == id and f.get("image"):
+            img_path = IMG / f["image"]
+            img_path.unlink(missing_ok=True)
+            f.pop("image", None)
+            f.pop("img_ts", None)
+            save(FF, filaments)
+    return {"ok": True}
+
+# ---- Trash ----
+@R.get("/trash")
+def get_trash():
+    return load(TJ, [])
+
+@R.post("/trash/restore")
+def restore_trash_item(b: dict):
+    l = load(TJ, [])
+    t = next((x for x in l if x["id"] == b["id"]), None)
+    if t:
+        trash_path = ROOT / ".trash" / t["id"]
+        if trash_path.exists():
+            target_path = ROOT / t["orig"]
+            target_path.parent.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(trash_path), str(target_path))
+        l.remove(t)
+        save(TJ, l)
+    return {"ok": True}
+
+@R.post("/trash/purge")
+def purge_trash(b: dict):
+    l = load(TJ, [])
+    if not b.get("id"):
+        # Empty all trash
+        for item in l:
+            trash_path = ROOT / ".trash" / item["id"]
+            if trash_path.exists():
+                shutil.rmtree(trash_path)
+        save(TJ, [])
+    else:
+        # Purge specific item
+        t = next((x for x in l if x["id"] == b["id"]), None)
+        if t:
+            trash_path = ROOT / ".trash" / t["id"]
+            if trash_path.exists():
+                shutil.rmtree(trash_path)
+            l.remove(t)
+            save(TJ, l)
+    return {"ok": True}
+
+# ---- Prints & Costs ----
+@R.post("/prints")
+def add_print(b: dict):
+    prints = load(PF, [])
+    p = {"id": uuid.uuid4().hex[:8], "filament_id": b["filament_id"], "grams": b["grams"], "name": b.get("name", ""), "file": b.get("file", ""), "ts": time.time(), "cost": b.get("cost", 0)}
+    prints.append(p)
+    save(PF, prints)
+    
+    # Update filament remaining weight
+    filaments = load(FF, [])
+    for f in filaments:
+        if f["id"] == b["filament_id"]:
+            prev = f["weight_remaining"]
+            f["weight_remaining"] = max(0, f["weight_remaining"] - b["grams"])
+            save(FF, filaments)
+            TB.low(f, prev)
+    
+    return p
+
+@R.get("/prints")
+def get_prints(filament_id: str = None):
+    prints = load(PF, [])
+    if filament_id:
+        prints = [p for p in prints if p["filament_id"] == filament_id]
+    return prints
+
+@R.get("/prints/summary")
+def get_prints_summary():
+    prints = load(PF, [])
+    filaments = load(FF, [])
+    
+    invested = sum(f.get("price_per_kg", 0) * f.get("weight_total", 0) / 1000 for f in filaments)
+    stock_value = sum(f.get("price_per_kg", 0) * f.get("weight_remaining", 0) / 1000 for f in filaments)
+    
+    by_month = {}
+    by_material = {}
+    
+    for p in prints:
+        f = next((x for x in filaments if x["id"] == p["filament_id"]), None)
+        if f:
+            month = time.strftime("%Y-%m", time.localtime(p["ts"]))
+            if month not in by_month:
+                by_month[month] = {"prints": 0, "grams": 0, "cost": 0}
+            by_month[month]["prints"] += 1
+            by_month[month]["grams"] += p["grams"]
+            by_month[month]["cost"] += p.get("cost", 0)
+            
+            material = f.get("material", "Unbekannt")
+            if material not in by_material:
+                by_material[material] = {"prints": 0, "grams": 0, "cost": 0}
+            by_material[material]["prints"] += 1
+            by_material[material]["grams"] += p["grams"]
+            by_material[material]["cost"] += p.get("cost", 0)
+    
+    return {"invested": invested, "stock_value": stock_value, "by_month": by_month, "by_material": by_material}
+
+@R.delete("/prints/{id}")
+def delete_print(id: str):
+    prints = load(PF, [])
+    p = next((x for x in prints if x["id"] == id), None)
+    if p:
+        # Restore filament weight
+        filaments = load(FF, [])
+        for f in filaments:
+            if f["id"] == p["filament_id"]:
+                f["weight_remaining"] += p["grams"]
+                save(FF, filaments)
+                TB.low(f, f["weight_remaining"] - p["grams"])
+                break
+        
+        prints.remove(p)
+        save(PF, prints)
+        return {"ok": True}
+    raise HTTPException(404, "Druck nicht gefunden")
+
+# ---- Estimate ----
+@R.post("/estimate")
+def estimate_consumption(b: dict):
+    p = safe(b["path"])
+    if not p.is_file(): raise HTTPException(404, "Datei nicht gefunden")
+    
+    # TODO: Implement actual consumption estimation
+    weight = b.get("grams", 100)
+    material = b.get("material", "PLA")
+    note = f"Geschätzter Verbrauch für {material}"
+    
+    return {"grams": weight, "note": note}
+
+# ---- Cache ----
+@R.delete("/cache")
+def clear_cache():
+    # TODO: Implement actual cache clearing
+    return {"ok": True}
+
+# ---- Stats ----
+@R.get("/stats")
+def get_stats():
+    total_files = sum(1 for _ in ROOT.rglob("*") if not _.is_dir())
+    total_size = sum(f.stat().st_size for f in ROOT.rglob("*") if f.is_file())
+    trash_count = len(load(TJ, []))
+    filaments_count = len(load(FF, []))
+    
+    # Get free space
+    free_space = shutil.disk_usage(ROOT).free
+    
+    return {
+        "files": total_files,
+        "bytes": total_size,
+        "free": free_space,
+        "trash": trash_count,
+        "filaments": filaments_count
+    }
+
+# ---- MCP Tokens ----
+@R.get("/mcp/tokens")
+def mcp_tokens():
+    return load(DATA / "mcp_tokens.json", [])
+
+@R.post("/mcp/tokens")
+def mcp_create(b: dict):
+    tokens = load(DATA / "mcp_tokens.json", [])
+    t = {
+        "name": b["name"],
+        "token": secrets.token_urlsafe(32),
+        "read_only": b.get("read_only", False),
+        "created": time.time()
+    }
+    tokens.append(t); save(DATA / "mcp_tokens.json", tokens)
+    return t
+
+@R.delete("/mcp/tokens/{i}")
+def mcp_delete(i: str):
+    tokens = load(DATA / "mcp_tokens.json", [])
+    tokens = [t for t in tokens if t.get("id") != i and t.get("token") != i]
+    save(DATA / "mcp_tokens.json", tokens); return {"ok": True}
 
 # ---- Filamente ----
 def norm(d):
