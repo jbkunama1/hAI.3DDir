@@ -33,6 +33,8 @@ dialog::backdialog{background:#0008}
 .spool{display:inline-block;width:34px;height:34px;border-radius:50%;vertical-align:middle;background:radial-gradient(circle,var(--p) 0 17%,#0003 18% 21%,var(--c) 22%)}
 .meter{height:6px;background:var(--l);border-radius:3px;width:130px;margin-bottom:3px}.meter i{display:block;height:100%;background:var(--ac);border-radius:3px}
 @media(min-width:760px){table{display:table}thead{display:table-header-group}tbody{display:table-row-group}tr{display:table-row;margin:0;padding:0}td{display:table-cell;padding:10px 12px}}
+.ic[data-t], .ic[data-s]{height:100px;display:flex;align-items:center;justify-content-center;object-fit:contain;background:#f5f5f5;border-radius:8px;margin-bottom:8px;}
+.si{font-size:12px;color:var(--m);margin-top:4px;word-break:break-all;}
 </style></head><body>
 <div id="prog"></div><div id="toast" hidden></div>
 <section id="login"><h1 class="logo">hAI.<b>3DDir</b></h1>
@@ -44,9 +46,10 @@ dialog::backdialog{background:#0008}
 <section id="t-fil" hidden><div class="bar"><input id="fq" type="search" placeholder="Suchen oder Barcode scannen…" style="flex:1"><button id="fa" class="pri">Neue Rolle</button></div><table><thead><tr><th>Marke</th><th>Material</th><th>Farbe</th><th>Rest / Gesamt</th><th></th></tr></thead><tbody id="ft"></tbody></table></section>
 <section id="t-adm" hidden><div class="st" id="as"></div>
 <form class="box f" id="sf"><b>Allgemein</b><label>Titel<input id="a_ti"></label><label>Standard-Theme<select id="a_th"></select></label><label>Standard-Sortierung<select id="a_sb"><option value="name">Name</option><option value="size">Größe</option><option value="date">Datum</option></select></label><label>Reihenfolge<select id="a_so"><option value="asc">Aufsteigend</option><option value="desc">Absteigend</option></select></label>
+<b>Dateiansicht</b><label><input id="a_vw" type="radio" name="file_view" value="icons"> Nur Symbole</label><label><input id="a_vw" type="radio" name="file_view" value="thumbs"> 3D-Thumbnails</label><label><input id="a_vw" type="radio" name="file_view" value="slicer"> Slicer-Daten</label>
 <b>Upload</b><label>Maximale Dateigröße (MB)<input id="a_mb" type="number" min="1" required></label><label>Erlaubte Endungen (kommagetrennt)<input id="a_ext"></label>
 <b>Papierkorb</b><label><input id="a_tr" type="checkbox"> Gelöschtes in Papierkorb</label><label>Automatisch leeren nach (Tagen)<input id="a_td" type="number" min="0"></label>
-<b>KI</b><small id="ais"></small><b>MCP</b><label><input id="a_me" type="checkbox"> MCP-Server aktiv</label><b>Telegram</b><small id="tgs"></small><button class="pri">Einstellungen speichern</button></form>
+<b>KI</b><small id="ais"></small><b>MCP</b><label><input id="a_me" type="checkbox"> MCP-Server aktiv</label><b>Telegram</b><small id="tgs"></small><button class="pri" id="cc">Slicer-Cache leeren</button><button class="pri">Einstellungen speichern</button></form>
 <form class="box f" id="pf"><b>Passwort</b><label>Neues Passwort<input id="a_pw" type="password" minlength="6"></label><button class="pri">Passwort ändern</button></form>
 <div class="box"><b>Backup</b><div class="bar"><a href="/api/backup"><button>Backup herunterladen</button></a><button id="bkb">Backup einspielen</button><input id="bkr" type="file" accept=".zip" hidden></div></div>
 <div class="box"><b>MCP-Server</b><table><thead><tr><th>Name</th><th>Rechte</th><th></th></tr></thead><tbody id="mt"></tbody></table><form id="mf" class="f"><input id="mn" placeholder="Name" required><button class="pri">Token erzeugen</button></form><pre id="mk" hidden></pre></div></section>
@@ -67,7 +70,69 @@ const start=()=>{document.getElementById("login").hidden=true;document.getElemen
 document.getElementById("lf").onsubmit=async e=>{e.preventDefault();try{await api("/login",{method:"POST",body:JSON.stringify({password:document.getElementById("pw").value})});start()}catch{alert("Falsches Passwort")}};
 document.getElementById("lo").onclick=async()=>{await api("/logout",{method:"POST"});showLogin()};
 // Files
-async function loadFiles(){const r=await api("/list");document.getElementById("gr").innerHTML=r.items.map(i=>`<div class="card" data-p="${i.name}"><div class="ic">${i.dir?'📁':'📄'}</div><div class="nm">${i.name}</div><div class="sz">${i.dir?'':''+fmt(i.size)}</div></div>`).join('')}
+const thumbMaxMB=20;
+async function loadFiles(){const r=await api("/list");const fileView=CFG.fileView||'thumbs';document.getElementById("gr").innerHTML=r.items.map(i=>{
+    let iconClass='ic';
+    let iconContent=i.dir?'📁':'📄';
+    let extraDiv='';
+    
+    if(fileView!=='icons'){
+        const ext=i.name.split('.').pop().toLowerCase();
+        const is3d=['stl','3mf','obj'].includes(ext);
+        const isSlicer=['gcode'].includes(ext);
+        
+        if(fileView==='slicer' && isSlicer){
+            iconClass='ic data-s=1';
+            extraDiv='<div class="si"></div>';
+        }else if(fileView==='slicer' && is3d){
+            iconClass='ic data-s=1';
+            extraDiv='<div class="si"></div>';
+        }else if(fileView==='thumbs' && is3d && i.size<thumbMaxMB*1048576){
+            iconClass='ic data-t=1';
+            extraDiv='<div class="si"></div>';
+        }
+    }
+    
+    return `<div class="card" data-p="${i.name}"><div class="${iconClass}">${iconContent}</div><div class="nm">${i.name}</div><div class="sz">${i.dir?'':''+fmt(i.size)}</div>${extraDiv}</div>`;
+    }).join('');observeElements()}
+// Load slicer information with IntersectionObserver
+const observerQueue=new Set();
+const observer=new IntersectionObserver((entries,obs)=>{
+    entries.forEach(entry=>{
+        if(entry.isIntersecting && observerQueue.has(entry.target)){
+            const card=entry.target;
+            const path=card.dataset.p;
+            observerQueue.delete(card);
+            obs.unobserve(card);
+            
+            if(card.querySelector('.data-s')) loadSlicerInfo(path, card);
+        }
+    });
+},{rootMargin:'200px'});
+async function loadSlicerInfo(path,card){
+    const mtime=card.querySelector('.si').dataset.v||'';
+    try{
+        const r=await api(`/slicer?path=${encodeURIComponent(path)}&v=${mtime}`);
+        if(r.has){
+            const infoDiv=card.querySelector('.si');
+            if(r.image){
+                infoDiv.innerHTML=`<img src="/api/slicer/image?path=${encodeURIComponent(path)}&v=${mtime}" style="max-width:100px;max-height:100px;">`;
+            }else{
+                const parts=[];
+                if(r.data.time_s) parts.push(`⏱ ${formatTime(r.data.time_s)}`);
+                if(r.data.grams) parts.push(`🧵 ${r.data.grams}g`);
+                if(r.data.layer_h) parts.push(`${r.data.layer_h}mm`);
+                infoDiv.textContent=parts.join(' · ');
+            }
+        }
+    }catch(e){}
+}
+function formatTime(s){
+    const h=Math.floor(s/3600);const m=Math.floor((s%3600)/60);const s2=s%60;
+    return h>0?`${h}h ${m}m`:m>0?`${m}m ${s2}s`:`${s2}s`;
+}
+// Update loadFiles to handle file_view
+CFG.fileView=fileView;
 // Filaments
 async function loadFil(){const r=await api("/filaments");document.getElementById("ft").innerHTML=r.map(f=>`<tr><td><span class="spool" style="--c:${f.color_hex}"></span>${f.color_name}</td><td>${f.material}</td><td><span class="meter"><i style="width:${f.weight_total?Math.min(100,f.weight_remaining/f.weight_total*100):0}%"></i></span>${f.weight_remaining}/${f.weight_total}g</td><td><button data-e="${f.id}">Bearbeiten</button></td></tr>`).join('')||'<tr><td colspan="4">Keine Rollen.</td></tr>'}
 document.getElementById("fa").onclick=()=>{document.getElementById("fm").showModal()};
@@ -75,7 +140,10 @@ document.getElementById("fx").onclick=()=>{document.getElementById("fm").close()
 document.getElementById("ff").onsubmit=async e=>{e.preventDefault();const d={brand:document.getElementById("f_brand").value,material:document.getElementById("f_material").value,color_name:document.getElementById("f_color_name").value,color_hex:document.getElementById("f_color_hex").value,weight_total:+document.getElementById("f_weight_total").value,weight_remaining:+document.getElementById("f_weight_remaining").value,price_per_kg:+document.getElementById("f_price_per_kg").value,purchase_date:document.getElementById("f_purchase_date").value};await api("/filaments",{method:"POST",body:JSON.stringify(d)});loadFil();document.getElementById("fm").close()};
 // Admin
 async function loadAdm(){const [s,t]=await Promise.all([api("/api/admin/settings"),api("/api/admin/stats")]);document.getElementById("a_ti").value=s.title;document.getElementById("a_th").value=s.default_theme;document.getElementById("a_mb").value=s.max_upload_mb;document.getElementById("a_ext").value=s.allowed_ext;document.getElementById("a_tr").checked=s.trash_enabled;document.getElementById("a_td").value=s.trash_days;document.getElementById("a_me").checked=s.mcp_enabled;document.getElementById("as").innerHTML=[["Dateien",t.files],["Belegt",fmt(t.bytes)],["Frei",fmt(t.free)],["Filamente",t.filaments]].map(([k,v])=>`<div>${k}<b>${v}</b></div>`).join('')}
-document.getElementById("sf").onsubmit=async e=>{e.preventDefault();await api("/api/admin/settings",{method:"PUT",body:JSON.stringify({title:document.getElementById("a_ti").value,default_theme:document.getElementById("a_th").value,max_upload_mb:+document.getElementById("a_mb").value,allowed_ext:document.getElementById("a_ext").value,trash_enabled:document.getElementById("a_tr").checked,trash_days:+document.getElementById("a_td").value,mcp_enabled:document.getElementById("a_me").checked})});toast("Gespeichert")};
+// Set file view radio buttons
+const fileView=s.file_view;for(const r of document.querySelectorAll('input[name="file_view"]')){r.checked=r.value===fileView}
+document.getElementById("sf").onsubmit=async e=>{e.preventDefault();await api("/api/admin/settings",{method:"PUT",body:JSON.stringify({title:document.getElementById("a_ti").value,default_theme:document.getElementById("a_th").value,max_upload_mb:+document.getElementById("a_mb").value,allowed_ext:document.getElementById("a_ext").value,trash_enabled:document.getElementById("a_tr").checked,trash_days:+document.getElementById("a_td").value,mcp_enabled:document.getElementById("a_me").checked,file_view:document.querySelector('input[name="file_view"]:checked').value})});toast("Gespeichert")};
+document.getElementById("cc").onclick=async e=>{e.preventDefault();await api("/api/admin/cache",{method:"DELETE"});toast("Cache geleert")};
 document.getElementById("pf").onsubmit=async e=>{e.preventDefault();await api("/api/admin/password",{method:"POST",body:JSON.stringify({password:document.getElementById("a_pw").value})});document.getElementById("a_pw").value="";toast("Passwort geändert")};
 document.getElementById("bkr").onchange=async e=>{const f=e.target.files[0];if(f){const r=await api("/api/admin/backup/restore",{method:"POST",body:FormData.fromEntries([[f.name,f]])});toast("Backup eingespielt")}};
 // MCP
@@ -87,6 +155,52 @@ const themes=["modern","nacht"];const setTheme=t=>{document.documentElement.setA
 const toast=m=>{const t=document.getElementById("toast");t.textContent=m;t.hidden=false;setTimeout(()=>t.hidden=true,3000)};
 // Format
 const fmt=s=>s>1e9?`${(s/1e9).toFixed(1)} GB`:s>1e6?`${(s/1e6).toFixed(1)} MB`:s>1e3?`${(s/1e3).toFixed(1)} KB`:s+' B';
+// Load slicer information with IntersectionObserver
+const observerQueue = new Set();
+const observer = new IntersectionObserver((entries, obs) => {
+    entries.forEach(entry => {
+        if (entry.isIntersecting && observerQueue.has(entry.target)) {
+            const card = entry.target;
+            const path = card.dataset.p;
+            observerQueue.delete(card);
+            obs.unobserve(card);
+            
+            if (card.querySelector('.data-s')) loadSlicerInfo(path, card);
+        }
+    });
+}, {rootMargin: '200px'});
+async function loadSlicerInfo(path, card) {
+    try {
+        const r = await api(`/slicer?path=${encodeURIComponent(path)}`);
+        if (r.has) {
+            const infoDiv = card.querySelector('.si');
+            if (r.image) {
+                infoDiv.innerHTML = `<img src="/api/slicer/image?path=${encodeURIComponent(path)}" style="max-width:100px;max-height:100px;">`;
+            } else {
+                const parts = [];
+                if (r.data.time_s) parts.push(`⏱ ${formatTime(r.data.time_s)}`);
+                if (r.data.grams) parts.push(`🧵 ${r.data.grams}g`);
+                if (r.data.layer_h) parts.push(`${r.data.layer_h}mm`);
+                infoDiv.textContent = parts.join(' · ');
+            }
+        }
+    } catch (e) {}
+}
+function formatTime(s) {
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const s2 = s % 60;
+    return h > 0 ? `${h}h ${m}m` : m > 0 ? `${m}m ${s2}s` : `${s2}s`;
+}
+
+// Observer for thumbnail loading
+function observeElements() {
+    document.querySelectorAll('.data-s').forEach(el => {
+        observerQueue.add(el.closest('.card'));
+        observer.observe(el.closest('.card'));
+    });
+}
+
 // Start
 const start=()=>{document.getElementById("login").hidden=true;document.getElementById("app").hidden=false;loadFiles();loadFil();loadAdm()};
 run(()=>{showLogin();document.getElementById("lf").onsubmit=async e=>{e.preventDefault();try{await api("/login",{method:"POST",body:JSON.stringify({password:document.getElementById("pw").value})});start()}catch{alert("Falsches Passwort")}}})();

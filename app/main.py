@@ -488,14 +488,15 @@ def get_stats():
     }
 
 # ---- MCP Tokens ----
-@R.get("/mcp/tokens")
-def mcp_tokens():
+@R_ADMIN.get("/mcp/tokens")
+def admin_mcp_tokens():
     return load(DATA / "mcp_tokens.json", [])
 
-@R.post("/mcp/tokens")
-def mcp_create(b: dict):
+@R_ADMIN.post("/mcp/tokens")
+def admin_mcp_create(b: dict):
     tokens = load(DATA / "mcp_tokens.json", [])
     t = {
+        "id": uuid.uuid4().hex[:8],
         "name": b["name"],
         "token": secrets.token_urlsafe(32),
         "read_only": b.get("read_only", False),
@@ -504,8 +505,8 @@ def mcp_create(b: dict):
     tokens.append(t); save(DATA / "mcp_tokens.json", tokens)
     return t
 
-@R.delete("/mcp/tokens/{i}")
-def mcp_delete(i: str):
+@R_ADMIN.delete("/mcp/tokens/{i}")
+def admin_mcp_delete(i: str):
     tokens = load(DATA / "mcp_tokens.json", [])
     tokens = [t for t in tokens if t.get("id") != i and t.get("token") != i]
     save(DATA / "mcp_tokens.json", tokens); return {"ok": True}
@@ -827,9 +828,92 @@ def mcp_tools():
                     "properties": {},
                     "required": []
                 }
+            },
+            {
+                "name": "get_slicer_info",
+                "description": "Get slicer information from a file",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "path": {"type": "string", "description": "Path to the file"}
+                    },
+                    "required": ["path"]
+                }
             }
         ]
     }
+
+# ---- Slicer Information ----
+@R.get("/slicer")
+def get_slicer_info(path: str):
+    p = safe(path)
+    if not p.is_file():
+        raise HTTPException(404, "Datei nicht gefunden")
+    
+    # Get file modification time for caching
+    mtime = p.stat().st_mtime
+    cache_dir = DATA / "cache" / "slicer"
+    
+    result = run_in_threadpool(EX.slicer_info, p, cache_dir)
+    
+    return {
+        "has": result["data"] or result["image"],
+        "data": result["data"],
+        "image": result["image"]
+    }
+
+@R.get("/slicer/image")
+def get_slicer_image(path: str, v: str):
+    p = safe(path)
+    if not p.is_file():
+        raise HTTPException(404, "Datei nicht gefunden")
+    
+    # Get file modification time for caching
+    mtime = p.stat().st_mtime
+    cache_dir = DATA / "cache" / "slicer"
+    
+    result = run_in_threadpool(EX.slicer_info, p, cache_dir)
+    
+    if not result["image"]:
+        raise HTTPException(404, "Kein Bild verfügbar")
+    
+    return FileResponse(
+        p,
+        media_type=EX._mime(result["image"]) if result["image"] else "image/png",
+        headers={"Cache-Control": "private, max-age=86400"}
+    )
+
+@R.delete("/cache")
+def clear_cache():
+    """Clear the slicer cache directory"""
+    import shutil
+    cache_dir = DATA / "cache"
+    if cache_dir.exists():
+        shutil.rmtree(cache_dir)
+    return {"ok": True}
+
+# ---- Admin Endpoints ----
+@R_ADMIN.get("/settings")
+def admin_get_settings():
+    s = settings()
+    return {k: s[k] for k in KEYS}
+
+@R_ADMIN.put("/settings")
+def admin_put_settings(b: dict):
+    s = load(SF, {})
+    for k, t in KEYS.items():
+        if k in b: s[k] = t(b[k])
+    save(SF, s)
+    return {"ok": True}
+
+@R_ADMIN.delete("/cache")
+def admin_clear_cache():
+    """Clear the slicer cache directory"""
+    import shutil
+    cache_dir = DATA / "cache"
+    if cache_dir.exists():
+        shutil.rmtree(cache_dir)
+    return {"ok": True}
 
 def cost_summary():
     prints = load(PF, [])
