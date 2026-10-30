@@ -48,18 +48,11 @@ def clean(n):
 app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
 app.add_middleware(SessionMiddleware, secret_key=os.getenv("SECRET_KEY") or secrets.token_hex(32),
                    max_age=7 * 86400, same_site="lax")
-@app.middleware("http")
-async def auth_middleware(request: Request, call_next):
-    if request.url.path.startswith("/api/") and not request.url.path.startswith("/api/config") and not request.url.path.startswith("/api/login") and not request.url.path.startswith("/api/logout") and not request.url.path.startswith("/api/health"):
-        session = request.session
-        if not session.get("ok"):
-            return JSONResponse({"error": "Nicht angemeldet"}, status_code=401)
-    response = await call_next(request)
-    return response
 def auth(r: Request):
     if not r.session.get("ok"): raise HTTPException(401, "Nicht angemeldet")
 A = APIRouter(prefix="/api")
-R = APIRouter(prefix="/api", dependencies=[Depends(auth)])
+R = APIRouter(prefix="/api")
+R_ADMIN = APIRouter(prefix="/api/admin", dependencies=[Depends(auth)])
 
 class Login(BaseModel): password: str
 class P(BaseModel):
@@ -71,7 +64,7 @@ class S(BaseModel):
 class PW(BaseModel): password: str
 
 fails = {}
-@A.post("/login")
+@R.post("/login")
 def login(b: Login, r: Request):
     ip, now = r.client.host if r.client else "?", time.time()
     a = [t for t in fails.get(ip, []) if now - t < 300]
@@ -79,9 +72,9 @@ def login(b: Login, r: Request):
     if not check_pw(b.password):
         fails[ip] = a + [now]; raise HTTPException(401, "Falsches Passwort")
     fails.pop(ip, None); r.session["ok"] = True; return {"auth": True}
-@A.post("/logout")
+@R.post("/logout")
 def logout(r: Request): r.session.clear(); return {"auth": False}
-@A.get("/me")
+@R.get("/me")
 def me(r: Request): return {"auth": bool(r.session.get("ok"))}
 
 # ---- Dateien ----
