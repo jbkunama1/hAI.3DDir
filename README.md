@@ -40,22 +40,38 @@
 
 ### 🎨 Filament-Management
 - **Detaillierte Verwaltung**: Marke, Material, Farbe, Gewicht
-- **Verbrauchstracking**: Gesamtgewicht vs. Restgewicht
-- **Import/Export**: CSV und JSON Formate
+- **Preis & Datum**: Preis pro kg und Anschaffungsdatum pro Rolle
+- **Kosten-Tracking**: Automatische Berechnung der Druckkosten
+- **Verbrauchstracking**: Gesamtgewicht vs. Restgewicht mit Restwert
+- **Import/Export**: CSV und JSON Formate (inkl. Preis/Datum)
 - **Benutzerdefinierte Kategorien und Notizen**
 - **Barcode-Scanner**: Kamera oder Handscanner support
 - **Foto-Management**: Pro Rolle ein Bild
 - **KI-Scan**: Foto vom Etikett füllt Felder automatisch
 - **Druck-Verlauf**: Verbrauch pro Druckauftrag mit Rückgängig machen
+- **Kostendialog**: Investiert vs. Restwert, monatliche Übersicht
+- **MCP-Integration**: Kosten-Summary per API aufrufbar
+
+### 📊 Dateiansicht
+- **Darstellungsmodi**: 
+  - **Nur Symbole**: Schnelle Dateiliste ohne Vorschau
+  - **3D-Thumbnails**: Browser-generierte 3D-Vorschauen für STL/3MF/OBJ
+  - **Slicer-Daten**: Druckzeit, Gewicht, Schichthöhe aus G-Code/3MF
+- **Slicer-Info**: Automatische Extraktion von Metadaten aus 3MF/G-Code
+- **Cache-System**: Lokaler Cache für schnelle Wiederverwendung
+- **Thumbnail-Generation**: 3D-Dateien bis 20 MB gerendert im Browser
 
 ### 🛠️ Admin-Funktionen
 - **Statistiken**: Dateianzahl, Speicherbelegung, Upload-Metriken
 - **Theme-Konfiguration**: 5 verschiedene Designs
 - **Sicherheit**: Passwort, Rate-Limit, Path-Traversal-Schutz
 - **Einstellungen**: Upload-Limits, erlaubte Dateiendungen
+- **Dateiansicht**: Auswahl von Symbole, 3D-Thumbnails, Slicer-Daten
+- **Slicer-Cache**: Automatische Bereinigung der Vorschau-Caches
 - **Benachrichtigungen**: Telegram-Integration
 - **MCP-Server**: Bearer-Token für KI-Agenten
 - **LLM-Konfiguration**: OpenAI-kompatible API für KI-Scan
+- **Backup/Restore**: Komplette Sicherung aller Einstellungen und Daten
 
 ### 🤖 Telegram-Bot
 - **Datei-Explorer**: Ordner durchklicken und senden (bis 50 MB)
