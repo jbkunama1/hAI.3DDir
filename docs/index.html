@@ -1,20 +1,516 @@
-<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>hAI.3DDir – 3D-Dateien im Browser</title>
-<meta name="description" content="Self-hosted Weboberfläche für deine Samba-Freigabe mit 3D-Vorschau und Filamentverwaltung.">
-<style>
-:root{--bg:#e8ecef;--p:#fff;--l:#d3dae0;--tx:#18222d;--m:#5f6b78;--ac:#0f6b80}
-@media(prefers-color-scheme:dark){:root{--bg:#0f1419;--p:#171e26;--l:#2a3441;--tx:#e6edf3;--m:#8d9aab;--ac:#3fb7d4}}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:17px/1.6 "Segoe UI",system-ui,sans-serif}
-main{max-width:860px;margin:0 auto;padding:48px 20px}h1{font-size:clamp(34px,8vw,60px);letter-spacing:-2px;margin:0 0 8px}h1 b{color:var(--ac)}
-.lead{color:var(--m);font-size:20px;margin:0 0 28px}.cta{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:40px}
-.cta a{padding:11px 18px;border-radius:8px;border:1px solid var(--l);background:var(--p);color:var(--tx);text-decoration:none;font-weight:600}.cta a:first-child{background:var(--ac);color:var(--bg);border-color:var(--ac)}
-.g{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px}.g div{background:var(--p);border:1px solid var(--l);border-radius:12px;padding:16px}.g span{font-size:28px}
-h2{margin:40px 0 12px}pre{background:var(--p);border:1px solid var(--l);border-radius:10px;padding:14px;overflow:auto;font-size:14px}footer{color:var(--m);font-size:14px;margin-top:48px}
-</style></head><body><main>
-<h1>hAI.<b>3DDir</b></h1><p class="lead">Deine Samba-Freigabe mit STL, 3MF und OBJ im Browser: hochladen, ansehen, aufräumen. Dazu eine Verwaltung für deine Filamentrollen.</p>
-<div class="cta"><a href="https://github.com/jbkunama1/hAI.3DDir">Repo auf GitHub</a><a href="https://github.com/jbkunama1/hAI.3DDir#-deployment-mit-portainer">Deployment</a></div>
-<div class="g"><div><span>🧊</span><h3>3D-Vorschau</h3>STL, 3MF und OBJ drehen und zoomen, mit Maßangabe.</div><div><span>📁</span><h3>Dateiverwaltung</h3>Upload per Drag &amp; Drop, Suche, Verschieben, ZIP-Download, Papierkorb.</div><div><span>🎨</span><h3>Filamente</h3>Material, Farbe, Restgewicht. Import und Export als CSV oder JSON.</div><div><span>📱</span><h3>Mobil und 5 Themes</h3>Modern, Nacht, Bunt, Werkstatt und Galaxie.</div></div>
-<h2>Start in einer Minute</h2><pre>docker network create highfishNetwork
-# docker-compose.yml als Portainer-Stack einfügen,
-# ENVs setzen: ADMIN_PASSWORD, SECRET_KEY, SHARE_HOST_PATH</pre>
-<footer>MIT-Lizenz · gebaut mit FastAPI und three.js · <a href="https://github.com/jbkunama1" style="color:var(--ac)">jbkunama1</a></footer>
-</main></body></html>
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>hAI.3DDir – Self-hosted 3D-Datei-Manager</title>
+    <meta name="description" content="Self-hosted Weboberfläche für deine Samba-Freigabe mit 3D-Vorschau, Filamentverwaltung und Telegram-Bot. Gebaut mit FastAPI und Docker für lokale Netzwerke.">
+    <meta name="keywords" content="3D-Druck, File-Sharing, Samba, FastAPI, Docker, Selfhosted, NAS, Filament-Management, Telegram Bot">
+    <meta name="author" content="jbkunama1">
+    <meta name="theme-color" content="#0f6b80">
+    <link rel="canonical" href="https://jbkunama1.github.io/hAI.3DDir/">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary: #0f6b80;
+            --primary-light: #3fb7d4;
+            --secondary: #ff6b6b;
+            --accent: #4ecdc4;
+            --bg: #f8fafc;
+            --surface: #ffffff;
+            --text: #1a202c;
+            --text-secondary: #4a5568;
+            --border: #e2e8f0;
+            --shadow: rgba(0, 0, 0, 0.1);
+            --gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        [data-theme="dark"] {
+            --bg: #0f1419;
+            --surface: #171e26;
+            --text: #e6edf3;
+            --text-secondary: #8d9aab;
+            --border: #2a3441;
+            --shadow: rgba(0, 0, 0, 0.3);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
+        /* Header */
+        header {
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            padding: 1rem 0;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: var(--primary);
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 2rem;
+        }
+
+        .nav-links a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            transition: color 0.3s ease;
+        }
+
+        .nav-links a:hover {
+            color: var(--primary);
+        }
+
+        .theme-toggle {
+            background: none;
+            border: none;
+            color: var(--text);
+            font-size: 1.2rem;
+            cursor: pointer;
+            padding: 0.5rem;
+        }
+
+        /* Hero */
+        .hero {
+            text-align: center;
+            padding: 5rem 0;
+            background: linear-gradient(135deg, var(--primary-light), var(--primary));
+            color: white;
+        }
+
+        .hero h1 {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+
+        .hero .subtitle {
+            font-size: 1.2rem;
+            margin-bottom: 2rem;
+            opacity: 0.9;
+        }
+
+        .hero-buttons {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn-primary {
+            background: white;
+            color: var(--primary);
+        }
+
+        .btn-secondary {
+            background: transparent;
+            color: white;
+            border: 2px solid white;
+        }
+
+        /* Features */
+        .features {
+            padding: 4rem 0;
+        }
+
+        .section-title {
+            text-align: center;
+            font-size: 2.5rem;
+            margin-bottom: 3rem;
+        }
+
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+        }
+
+        .feature-card {
+            background: var(--surface);
+            border-radius: 12px;
+            padding: 2rem;
+            box-shadow: 0 4px 6px var(--shadow);
+            border: 1px solid var(--border);
+        }
+
+        .feature-icon {
+            font-size: 2.5rem;
+            color: var(--primary);
+            margin-bottom: 1rem;
+        }
+
+        .feature-card h3 {
+            font-size: 1.25rem;
+            margin-bottom: 0.5rem;
+        }
+
+        /* Architecture */
+        .architecture {
+            padding: 4rem 0;
+            background: var(--surface);
+            border-radius: 20px;
+            margin: 2rem 0;
+        }
+
+        .arch-diagram {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .arch-component {
+            background: var(--bg);
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            padding: 1rem;
+            text-align: center;
+            min-width: 120px;
+        }
+
+        .arch-component i {
+            font-size: 2rem;
+            color: var(--primary);
+            margin-bottom: 0.5rem;
+        }
+
+        .tech-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+            margin-top: 2rem;
+        }
+
+        .tech-item {
+            text-align: center;
+            padding: 1.5rem;
+            background: var(--surface);
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+
+        .tech-icon {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .tech-item:nth-child(1) .tech-icon { color: #3776ab; }
+        .tech-item:nth-child(2) .tech-icon { color: #009688; }
+        .tech-item:nth-child(3) .tech-icon { color: #2496ed; }
+        .tech-item:nth-child(4) .tech-icon { color: #066da5; }
+        .tech-item:nth-child(5) .tech-icon { color: #f14e32; }
+
+        /* CTA */
+        .cta {
+            padding: 4rem 0;
+            background: var(--gradient);
+            color: white;
+            text-align: center;
+            border-radius: 20px;
+            margin: 2rem 0;
+        }
+
+        .cta h2 {
+            font-size: 2rem;
+            margin-bottom: 1rem;
+        }
+
+        .cta-buttons {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            margin-top: 2rem;
+        }
+
+        /* Footer */
+        footer {
+            background: var(--surface);
+            border-top: 1px solid var(--border);
+            padding: 2rem 0;
+            margin-top: 4rem;
+        }
+
+        .footer-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 2rem;
+        }
+
+        .footer-links {
+            display: flex;
+            gap: 2rem;
+        }
+
+        .footer-links a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            transition: color 0.3s ease;
+        }
+
+        .footer-links a:hover {
+            color: var(--primary);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .nav-links {
+                display: none;
+            }
+
+            .hero h1 {
+                font-size: 2rem;
+            }
+
+            .feature-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .footer-content {
+                flex-direction: column;
+                text-align: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <nav class="container">
+            <div class="logo">
+                <i class="fas fa-cube"></i>
+                <span>hAI.3DDir</span>
+            </div>
+            <div class="nav-links">
+                <a href="#features">Features</a>
+                <a href="#tech">Technologie</a>
+                <a href="#deployment">Deployment</a>
+                <a href="https://github.com/jbkunama1/hAI.3DDir" target="_blank">GitHub</a>
+                <button class="theme-toggle">
+                    <i class="fas fa-moon"></i>
+                </button>
+            </div>
+        </nav>
+    </header>
+
+    <section class="hero">
+        <div class="container">
+            <h1>🧊 hAI.3DDir</h1>
+            <p class="subtitle">Self-hosted Weboberfläche für deine Samba-Freigabe mit 3D-Vorschau, Filamentverwaltung und Telegram-Bot</p>
+            <div class="hero-buttons">
+                <a href="https://github.com/jbkunama1/hAI.3DDir" class="btn btn-primary" target="_blank">
+                    <i class="fab fa-github"></i>
+                    GitHub Repo
+                </a>
+                <a href="#deployment" class="btn btn-secondary">
+                    <i class="fas fa-rocket"></i>
+                    Jetzt starten
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <section id="features" class="features">
+        <div class="container">
+            <h2 class="section-title">🌟 Hauptfunktionen</h2>
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-folder-open"></i>
+                    </div>
+                    <h3>📁 Dateiverwaltung</h3>
+                    <p>Ordner navigieren, Dateien per Drag & Drop hochladen, umbenennen, verschieben und löschen mit ZIP-Download.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-search"></i>
+                    </div>
+                    <h3>🔍 Volltextsuche</h3>
+                    <p>Globale Suche über die gesamte Freigabe mit Filteroptionen für verschiedene Dateitypen.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-cube"></i>
+                    </div>
+                    <h3>🧊 3D-Vorschau</h3>
+                    <p>Interaktive 3D-Modelle (STL, 3MF, OBJ) drehen, zoomen und mit Maßangaben versehen.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-film"></i>
+                    </div>
+                    <h3>🎨 Filamentverwaltung</h3>
+                    <p>Detailliertes Tracking von Marke, Material, Farbe und Gewicht mit Import/Export.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-robot"></i>
+                    </div>
+                    <h3>🤖 Telegram-Bot</h3>
+                    <p>Datei-Explorer, Upload-Funktion, Filament-Management und Push-Benachrichtigungen.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-palette"></i>
+                    </div>
+                    <h3>🌈 5 Themes</h3>
+                    <p>Modern, Nacht, Bunt, Werkstatt und Galaxie mit vollständig responsivem Design.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="tech" class="tech">
+        <div class="container">
+            <h2 class="section-title">⚙️ Technologie-Stack</h2>
+            <div class="tech-grid">
+                <div class="tech-item">
+                    <div class="tech-icon">
+                        <i class="fab fa-python"></i>
+                    </div>
+                    <h4>Python 3.12</h4>
+                    <p>Backend Logik</p>
+                </div>
+                <div class="tech-item">
+                    <div class="tech-icon">
+                        <i class="fas fa-bolt"></i>
+                    </div>
+                    <h4>FastAPI</h4>
+                    <p>Web Framework</p>
+                </div>
+                <div class="tech-item">
+                    <div class="tech-icon">
+                        <i class="fab fa-docker"></i>
+                    </div>
+                    <h4>Docker</h4>
+                    <p>Containerisierung</p>
+                </div>
+                <div class="tech-item">
+                    <div class="tech-icon">
+                        <i class="fas fa-cubes"></i>
+                    </div>
+                    <h4>Three.js</h4>
+                    <p>3D Rendering</p>
+                </div>
+                <div class="tech-item">
+                    <div class="tech-icon">
+                        <i class="fas fa-mobile-alt"></i>
+                    </div>
+                    <h4>Vue.js</h4>
+                    <p>Frontend SPA</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="deployment" class="cta container">
+        <h2>🚀 In 3 Minuten deployed</h2>
+        <p>Docker-basierte Installation mit Portainer - einfach und effizient</p>
+        <div class="cta-buttons">
+            <a href="https://github.com/jbkunama1/hAI.3DDir#-deployment-mit-portainer" class="btn btn-primary">
+                <i class="fas fa-play"></i>
+                Anleitung starten
+            </a>
+            <a href="https://github.com/jbkunama1/hAI.3DDir" class="btn btn-secondary" target="_blank">
+                <i class="fab fa-github"></i>
+                GitHub Repo
+            </a>
+        </div>
+    </section>
+
+    <footer>
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-links">
+                    <a href="https://github.com/jbkunama1/hAI.3DDir/issues">Issues</a>
+                    <a href="https://github.com/jbkunama1/hAI.3DDir/discussions">Diskussionen</a>
+                    <a href="https://github.com/jbkunama1/hAI.3DDir/blob/main/LICENSE">Lizenz</a>
+                </div>
+                <div style="color: var(--text-secondary);">
+                    © 2024 hAI.3DDir | MIT License | jbkunama1
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Theme Toggle
+        const themeToggle = document.querySelector('.theme-toggle');
+        const body = document.body;
+        const icon = themeToggle.querySelector('i');
+
+        const savedTheme = localStorage.getItem('theme') || 'light';
+        body.setAttribute('data-theme', savedTheme);
+        updateThemeIcon(savedTheme);
+
+        themeToggle.addEventListener('click', () => {
+            const currentTheme = body.getAttribute('data-theme');
+            const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+            
+            body.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+            updateThemeIcon(newTheme);
+        });
+
+        function updateThemeIcon(theme) {
+            icon.className = theme === 'light' ? 'fas fa-moon' : 'fas fa-sun';
+        }
+
+        // Smooth scrolling
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
+            });
+        });
+    </script>
+</body>
+</html>
