@@ -1,11 +1,14 @@
 """Telegram-Bot mit Inline-Buttons (Long Polling, kein offener Port nötig)."""
-import os, time, json, html, threading
+import os, re, time, json, html, threading
 from pathlib import Path
 import httpx
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
 ALLOWED = {int(x) for x in os.getenv("TELEGRAM_ALLOWED_IDS", "").replace(" ", "").split(",") if x.lstrip("-").isdigit()}
 API = f"https://api.telegram.org/bot{TOKEN}"
+ADMIN = {int(x) for x in os.getenv("TELEGRAM_ADMIN_IDS", "").replace(" ", "").split(",") if x.lstrip("-").isdigit()} or ALLOWED
 H = httpx.Client(timeout=40)
 S, BOT, PER, E = {}, {"name": ""}, 12, html.escape
 
@@ -28,7 +31,7 @@ def st(cid): return S.setdefault(cid, {"cwd": "", "mode": "browse", "items": []}
 
 def menu(cid, mid=None):
     show(cid, mid, "🧊 <b>hAI.3DDir</b>\nWas möchtest du tun?\n<i>Tipp: Schick mir eine Datei, dann lege ich sie im Ordner deiner Wahl ab.</i>",
-         [[b("📁 Dateien", "fi"), b("🔎 Suche", "se")], [b("🧵 Filamente", "fl")]])
+         [[b("📁 Dateien", "fi"), b("🔎 Suche", "se")], [b("🧵 Filamente", "fl")] + ([b("🛠 Admin", "ad")] if cid in ADMIN else [])])
 
 # ---- Dateien ----
 def show_list(cid, mid, page, head):
@@ -91,19 +94,66 @@ def fil_detail(cid, mid, fid):
     if not r: return fil_list(cid, mid)
     p = r["weight_remaining"] / r["weight_total"] * 100 if r["weight_total"] else 0
     txt = (f"🧵 <b>{E(r['material'])}</b> · {E(r['color_name'])}\n{E(r['brand'])}\n{bar(min(p, 100))} {p:.0f} %\n"
-           f"Rest: <b>{r['weight_remaining']:g}</b> / {r['weight_total']:g} g" + (f"\n📝 {E(r['notes'])}" if r["notes"] else ""))
-    show(cid, mid, txt, [[b(f"−{g} g", f"fa:{fid}:{g}") for g in (10, 50, 100)], [b("✏️ Wert setzen", f"fs:{fid}")], [b("⬅ Liste", "fl"), b("🏠 Menü", "m")]])
+           f"Rest: <b>{r['weight_remaining']:g}</b> / {r['weight_total']:g} g" + (f"\n🏷 {E(r['barcode'])}" if r.get("barcode") else "") + (f"\n📝 {E(r['notes'])}" if r["notes"] else ""))
+    show(cid, mid, txt, [[b(f"−{g} g", f"fa:{fid}:{g}") for g in (10, 50, 100)], [b("🖨 Druck buchen", f"fp:{fid}"), b("✏️ Wert setzen", f"fs:{fid}")], [b("📷 Foto setzen", f"fi2:{fid}")] + ([b("🖼 Foto", f"fv:{fid}")] if r.get("image") else []), [b("⬅ Liste", "fl"), b("🏠 Menü", "m")]])
 def setrem(fid, fn):
     m = M(); l = m.load(m.FF, [])
     for r in l:
         if r["id"] == fid:
             prev = r["weight_remaining"]; r["weight_remaining"] = max(0.0, round(fn(prev), 1)); m.save(m.FF, l); low(r, prev); return r
-def low(r, prev):
-    s = M().settings(); t = s["tg_low_g"]
-    if s["tg_notify_low"] and prev > t >= r["weight_remaining"]:
-        notify(f"⚠️ <b>Wenig Filament:</b> {E(r['brand'])} {E(r['material'])} {E(r['color_name'])}: nur noch {r['weight_remaining']:g} g")
+def low(r, prev): pass  # Warnungen bei wenig Filament sind entfernt
 def upload_note(names, path):
     if M().settings()["tg_notify_upload"]: notify(f"⬆️ Upload: <b>{E(', '.join(names))}</b> → <code>/{E(path or '')}</code>")
+
+def on_photo(cid, photos):
+    s = st(cid); aw = s.pop("await", None) or ""
+    if not aw.startswith("img:"): return send(cid, "Zum Hinterlegen: Rolle öffnen, dann 📷 Foto setzen.")
+    fp = call("getFile", file_id=photos[-1]["file_id"])["file_path"]
+    M().set_image(aw[4:], H.get(f"https://api.telegram.org/file/bot{TOKEN}/{fp}").content, "image/jpeg")
+    send(cid, "✅ Foto gespeichert."); fil_detail(cid, None, aw[4:])
+def send_img(cid, fid):
+    m = M(); r = next((x for x in m.load(m.FF, []) if x["id"] == fid), None)
+    if r and r.get("image"):
+        with open(m.IMG / r["image"], "rb") as f: H.post(f"{API}/sendPhoto", data={"chat_id": cid}, files={"photo": (r["image"], f)}, timeout=60)
+
+# ---- Bericht, Backup, Zeitplan ----
+def now():
+    try: return datetime.now(ZoneInfo(os.getenv("TZ", "Europe/Berlin")))
+    except Exception: return datetime.now()
+def fmtb(n): return f"{n / 1e9:.1f} GB" if n > 1e9 else f"{n / 1e6:.0f} MB"
+def report():
+    m = M(); thr = m.settings()["tg_low_g"]; s = m.stats(); l = m.load(m.FF, []); lo = [r for r in l if r["weight_remaining"] <= thr]
+    body = (f"📁 {s['files']} Dateien, {fmtb(s['bytes'])} belegt, {fmtb(s['free'])} frei\n🗑 {s['trash']} im Papierkorb\n"
+            f"🧵 {len(l)} Rollen, {sum(r['weight_remaining'] for r in l) / 1000:.2f} kg Rest")
+    if lo: body += f"\n⚠️ Höchstens {thr} g Rest:\n" + "\n".join(f"• {E(r['brand'])} {E(r['material'])} {E(r['color_name'])}: {r['weight_remaining']:g} g" for r in lo[:10])
+    return body, [[b("🧵 Filamente", "fl"), b("📁 Dateien", "fi")], [b("🛠 Admin", "ad")]]
+def send_backup(cid, cap="💾 Backup Filament-DB"):
+    m = M(); p = m.make_backup()
+    try:
+        big = os.path.getsize(p) > 45 * 1048576 and m.FF.exists()
+        with open(m.FF if big else p, "rb") as f:
+            H.post(f"{API}/sendDocument", data={"chat_id": cid, "caption": cap}, files={"document": (f"filamente-{now():%Y%m%d}." + ("json" if big else "zip"), f)}, timeout=300)
+    finally: os.unlink(p)
+def sched():
+    m = M(); sf = m.DATA / "telegram_state.json"
+    while not BOT["name"]: time.sleep(5)
+    try:
+        n, s = now(), m.settings()
+        if s["tg_notify_start"]:
+            body, rows = report()
+            for c in ALLOWED: send(c, f"🟢 <b>hAI.3DDir gestartet</b> ({n:%d.%m.%Y %H:%M})\n" + body, rows)
+        if n.strftime("%H:%M") >= s["tg_daily_time"]: m.save(sf, {**m.load(sf, {}), "daily": n.strftime("%Y-%m-%d")})
+    except Exception as e: print("telegram start:", repr(e), flush=True)
+    while True:
+        try:
+            n, s, stt = now(), m.settings(), m.load(sf, {})
+            if s["tg_daily"] and n.strftime("%H:%M") >= s["tg_daily_time"] and stt.get("daily") != n.strftime("%Y-%m-%d"):
+                m.save(sf, {**stt, "daily": n.strftime("%Y-%m-%d")}); body, rows = report()
+                for c in ALLOWED: send(c, f"📊 <b>Tagesbericht</b> ({n:%d.%m.%Y})\n" + body, rows)
+                if s["tg_daily_backup"]:
+                    for c in ADMIN: send_backup(c, "💾 Tägliches Backup der Filament-DB")
+        except Exception as e: print("telegram daily:", repr(e), flush=True)
+        time.sleep(30)
 
 # ---- Routing ----
 def route(cid, mid, d):
@@ -125,6 +175,15 @@ def route(cid, mid, d):
         fid, g = x.split(":")
         if setrem(fid, lambda v: v - float(g)): fil_detail(cid, mid, fid)
     elif a == "fs": s["await"] = "w:" + x; send(cid, "✏️ Neues Restgewicht in Gramm senden.")
+    elif a == "fp": s["await"] = "b:" + x; send(cid, "🖨 Verbrauch in Gramm senden, optional mit Namen, z. B. <code>45 Benchy</code>")
+    elif a == "fi2": s["await"] = "img:" + x; send(cid, "📷 Schick mir jetzt das Foto der Rolle.")
+    elif a == "fv": send_img(cid, x)
+    elif a in ("ad", "ab", "ar", "at", "aty") and cid not in ADMIN: send(cid, "⛔ Nur für Admins.")
+    elif a == "ad": show(cid, mid, "🛠 <b>Admin</b>", [[b("💾 Backup Filament-DB", "ab")], [b("📊 Bericht jetzt", "ar"), b("🗑 Papierkorb leeren", "at")], [b("🏠 Menü", "m")]])
+    elif a == "ab": send_backup(cid)
+    elif a == "ar": body, rows = report(); send(cid, f"📊 <b>Bericht</b> ({now():%d.%m.%Y %H:%M})\n" + body, rows)
+    elif a == "at": show(cid, mid, "🗑 Papierkorb wirklich endgültig leeren?", [[b("✅ Ja, leeren", "aty"), b("✖ Abbrechen", "ad")]])
+    elif a == "aty": M().trash_purge(M().IDs(id="")); show(cid, mid, "✅ Papierkorb geleert.", [[b("⬅ Admin", "ad")]])
 
 def handle(u):
     cq = u.get("callback_query"); msg = cq["message"] if cq else u.get("message")
@@ -135,6 +194,7 @@ def handle(u):
         return
     if cq:
         call("answerCallbackQuery", callback_query_id=cq["id"]); return route(cid, msg["message_id"], cq["data"])
+    if "photo" in msg: return on_photo(cid, msg["photo"])
     if "document" in msg: return on_doc(cid, msg["document"])
     t = (msg.get("text") or "").strip(); aw = st(cid).pop("await", None); cmd, _, arg = t.partition(" ")
     if cmd == "/files": st(cid).update(cwd="", mode="browse"); view(cid)
@@ -142,6 +202,14 @@ def handle(u):
     elif cmd == "/search" and arg: do_search(cid, arg)
     elif cmd == "/search": st(cid)["await"] = "search"; send(cid, "🔎 Suchbegriff?")
     elif aw == "search" and not t.startswith("/"): do_search(cid, t)
+    elif aw and aw.startswith("b:") and not t.startswith("/"):
+        mt = re.match(r"([\d.,]+)\s*(.*)", t)
+        if not mt: return send(cid, "Bitte so: <code>45 Benchy</code>")
+        try: res = M().print_add({"filament_id": aw[2:], "grams": float(mt.group(1).replace(",", ".")), "name": mt.group(2)})
+        except Exception as e: return send(cid, "⚠️ " + E(str(getattr(e, "detail", e))))
+        send(cid, f"✅ {res['print']['grams']:g} g gebucht."); fil_detail(cid, None, aw[2:])
+    elif not aw and not t.startswith("/") and re.fullmatch(r"(?=.*\d)\S{6,}", t) and M().find_barcode(t):
+        fil_detail(cid, None, M().find_barcode(t)["id"])
     elif aw and aw.startswith("w:") and not t.startswith("/"):
         try: v = float(t.replace(",", "."))
         except ValueError: return send(cid, "Bitte eine Zahl senden.")
@@ -166,6 +234,6 @@ def loop():
         except Exception: time.sleep(5)
 
 def start():
-    if TOKEN and ALLOWED: threading.Thread(target=loop, daemon=True).start()
+    if TOKEN and ALLOWED: threading.Thread(target=loop, daemon=True).start(); threading.Thread(target=sched, daemon=True).start()
     elif TOKEN: print("Telegram: TELEGRAM_ALLOWED_IDS fehlt, Bot bleibt aus", flush=True)
 def status(): return {"enabled": bool(TOKEN and ALLOWED), "token": bool(TOKEN), "allowed": len(ALLOWED), "bot": BOT["name"]}

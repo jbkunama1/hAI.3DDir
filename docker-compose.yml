@@ -12,9 +12,15 @@ services:
       MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-500}
       PUID: ${PUID:-1000}
       PGID: ${PGID:-1000}
-      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
-      TELEGRAM_ALLOWED_IDS: ${TELEGRAM_ALLOWED_IDS:-}
-      TZ: ${TZ:-Europe/Berlin}
+          LLM_BASE_URL: ${LLM_BASE_URL:-}
+          LLM_API_KEY: ${LLM_API_KEY:-}
+          LLM_MODEL: ${LLM_MODEL:-}
+          LLM_VERIFY_TLS: ${LLM_VERIFY_TLS:-true}
+          MCP_TOKEN: ${MCP_TOKEN:-}
+          TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+          TELEGRAM_ALLOWED_IDS: ${TELEGRAM_ALLOWED_IDS:-}
+          TELEGRAM_ADMIN_IDS: ${TELEGRAM_ADMIN_IDS:-}
+          TZ: ${TZ:-Europe/Berlin}
     networks:
       - highfishNetwork
     volumes:

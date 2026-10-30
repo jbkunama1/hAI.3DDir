@@ -43,6 +43,10 @@
 - **Verbrauchstracking**: Gesamtgewicht vs. Restgewicht
 - **Import/Export**: CSV und JSON Formate
 - **Benutzerdefinierte Kategorien und Notizen**
+- **Barcode-Scanner**: Kamera oder Handscanner support
+- **Foto-Management**: Pro Rolle ein Bild
+- **KI-Scan**: Foto vom Etikett füllt Felder automatisch
+- **Druck-Verlauf**: Verbrauch pro Druckauftrag mit Rückgängig machen
 
 ### 🛠️ Admin-Funktionen
 - **Statistiken**: Dateianzahl, Speicherbelegung, Upload-Metriken
@@ -50,6 +54,8 @@
 - **Sicherheit**: Passwort, Rate-Limit, Path-Traversal-Schutz
 - **Einstellungen**: Upload-Limits, erlaubte Dateiendungen
 - **Benachrichtigungen**: Telegram-Integration
+- **MCP-Server**: Bearer-Token für KI-Agenten
+- **LLM-Konfiguration**: OpenAI-kompatible API für KI-Scan
 
 ### 🤖 Telegram-Bot
 - **Datei-Explorer**: Ordner durchklicken und senden (bis 50 MB)
@@ -195,6 +201,12 @@ docker run -d \
 | `ALLOWED_EXTENSIONS` | `stl,3mf,obj,step,gcode,zip,png,jpg,pdf,txt` | Erlaubte Dateitypen |
 | `TELEGRAM_BOT_TOKEN` | - | Bot Token von @BotFather |
 | `TELEGRAM_ALLOWED_IDS` | - | Erlaubte User IDs (kommagetrennt) |
+| `TELEGRAM_ADMIN_IDS` | - | Admin IDs für Telegram Bot |
+| `LLM_BASE_URL` | - | OpenAI-kompatible API URL |
+| `LLM_MODEL` | - | Modellname mit Vision Support |
+| `LLM_API_KEY` | - | API Schlüssel für KI-Scan |
+| `LLM_VERIFY_TLS` | `true` | TLS Verifikation für LLM API |
+| `MCP_TOKEN` | - | Bearer Token für MCP Server |
 | `PORT` | `8080` | Host Port |
 | `TZ` | `UTC` | Zeitzone |
 
@@ -245,6 +257,9 @@ Nach einer Passwortänderung im Admin-Tab gilt das neue Passwort statt `ADMIN_PA
 - **Verbrauch buchen**: −10g, −50g, −100g BUTTONS
 - **Manuell setzen**: Gewicht direkt eingeben möglich
 - **Warnungen**: Automatische Benachrichtigung bei <100g Rest
+- **Barcode-Suche**: Rolle per Barcode finden
+- **Foto-Upload**: Rollenfoto direkt an den Bot senden
+- **KI-Etikett-Scan**: Foto vom Etikett analysieren
 
 #### 🔔 System-Notifikationen
 - **Filament-Niedrigstand**: Automatische Warnung
@@ -258,6 +273,8 @@ Nach einer Passwortänderung im Admin-Tab gilt das neue Passwort statt `ADMIN_PA
 | `/search <text>` | Dateisuche durchführen |
 | `/stats` | Systemstatistiken anzeigen |
 | `/help` | Hilfetext anzeigen |
+| `/filament <barcode>` | Rolle per Barcode finden |
+| `/backup` | Filament-Daten backupen |
 
 ### 🔒 Sicherheit
 - **White-List**: Nur erlaubte User-IDs können Bot nutzen
@@ -359,10 +376,10 @@ Erweitere die erlaubten Dateitypen im Admin-Tab:
 ## 🗺️ Roadmap
 
 ### In Entwicklung (Q1 2024)
-- [ ] 🧵 **Druck-Spezifische Filament-Abbuchung**: Verbrauch pro Druckauftrag tracken
-- [ ] 📊 **Detaillierte Druck-Statistiken**: Druckdauer, Materialverbrauch, Erfolgswahrscheinlichkeit
+- [x] 🧵 **Druck-Spezifische Filament-Abbuchung**: Verbrauch pro Druckauftrag tracken
+- [x] 📊 **Detaillierte Druck-Statistiken**: Druckdauer, Materialverbrauch, Erfolgswahrscheinlichkeit
 - [ ] 🔗 **Integration mit Cura/PrusaSlicer**: Direkter Import von Druckkonfigurationen
-- [ ] ☁️ **Cloud-Backup**: Automatisches Backup der Filament-Daten
+- [x] ☁️ **Cloud-Backup**: Automatisches Backup der Filament-Daten
 
 ### Geplant (Q2 2024)
 - [ ] 🤖 **KI-gestützte Datei-Organisation**: Automatische Kategorisierung nach Inhalten
