@@ -6,6 +6,8 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 from pydantic import BaseModel
 from . import telegram_bot as TB
+from . import mcp_server as MCP
+from . import extras as EX
 
 ROOT = Path(os.getenv("SHARE_PATH", "/share")).resolve()
 DATA = Path(os.getenv("DATA_DIR", "/data")).resolve()
@@ -15,7 +17,8 @@ if os.getuid() == 0:  # Rechte auf PUID/PGID absenken, damit Dateien auf dem Sha
     os.chown(DATA, u, g); os.setgid(g); os.setuid(u)
 
 SF, FF = DATA / "settings.json", DATA / "filaments.json"
-FIELDS = ["brand", "material", "color_name", "color_hex", "weight_total", "weight_remaining", "notes"]
+PF, IMG = DATA / "prints.json", DATA / "img"; IMG.mkdir(exist_ok=True)
+FIELDS = ["brand", "material", "color_name", "color_hex", "weight_total", "weight_remaining", "notes", "barcode"]
 
 def load(f, d):
     try: return json.loads(f.read_text("utf-8"))
@@ -23,7 +26,7 @@ def load(f, d):
 def save(f, v): f.write_text(json.dumps(v, ensure_ascii=False, indent=1), "utf-8")
 def settings():
     s = {"max_upload_mb": int(os.getenv("MAX_UPLOAD_MB", 500)),
-         "allowed_ext": os.getenv("ALLOWED_EXTENSIONS", "stl,3mf,obj,step,stp,gcode,zip,png,jpg,pdf,txt"), "pw_hash": None, "trash_enabled": True, "trash_days": 30, "default_theme": "modern", "title": "hAI.3DDir", "thumb_max_mb": 20, "tg_low_g": 100, "tg_notify_low": True, "tg_notify_upload": True}
+         "allowed_ext": os.getenv("ALLOWED_EXTENSIONS", "stl,3mf,obj,step,stp,gcode,zip,png,jpg,pdf,txt"), "pw_hash": None, "trash_enabled": True, "trash_days": 30, "default_theme": "modern", "title": "hAI.3DDir", "thumb_max_mb": 20, "tg_low_g": 100, "tg_notify_start": True, "tg_daily": True, "tg_daily_time": "08:00", "tg_daily_backup": False, "tg_notify_upload": True, "mcp_enabled": True, "folder_view": "links", "sort_by": "name", "sort_order": "asc"}
     s.update(load(SF, {})); return s
 def hpw(pw, salt=None):
     salt = salt or secrets.token_hex(8)
@@ -135,7 +138,7 @@ def delete(b: P):
     return {"ok": True}
 
 # ---- Admin ----
-KEYS = {"max_upload_mb": int, "allowed_ext": str, "trash_enabled": bool, "trash_days": int, "default_theme": str, "title": str, "thumb_max_mb": int, "tg_low_g": int, "tg_notify_low": bool, "tg_notify_upload": bool}
+KEYS = {"max_upload_mb": int, "allowed_ext": str, "trash_enabled": bool, "trash_days": int, "default_theme": str, "title": str, "thumb_max_mb": int, "tg_low_g": int, "tg_notify_start": bool, "tg_daily": bool, "tg_daily_time": str, "tg_daily_backup": bool, "tg_notify_upload": bool, "mcp_enabled": bool, "folder_view": str, "sort_by": str, "sort_order": str}
 @R.get("/settings")
 def get_settings():
     s = settings(); return {k: s[k] for k in KEYS}
@@ -147,7 +150,7 @@ def put_settings(b: dict):
     save(SF, s); return {"ok": True}
 @A.get("/config")
 def config():
-    s = settings(); return {"title": s["title"], "default_theme": s["default_theme"], "thumb_max_mb": s["thumb_max_mb"]}
+    s = settings(); return {"title": s["title"], "default_theme": s["default_theme"], "thumb_max_mb": s["thumb_max_mb"], "folder_view": s["folder_view"], "sort_by": s["sort_by"], "sort_order": s["sort_order"]}
 @app.get("/health")
 def health(): return {"status": "ok"}
 
@@ -159,7 +162,7 @@ def set_pw(b: PW):
 # ---- Filamente ----
 def norm(d):
     d = {str(k).strip().lower(): v for k, v in d.items() if k}
-    o = {k: str(d.get(k) or "").strip() for k in ("brand", "material", "color_name", "color_hex", "notes")}
+    o = {k: str(d.get(k) or "").strip() for k in ("brand", "material", "color_name", "color_hex", "notes", "barcode")}
     for k in ("weight_total", "weight_remaining"):
         try: o[k] = float(str(d.get(k) or 0).replace(",", "."))
         except ValueError: o[k] = 0
@@ -179,6 +182,8 @@ def fput(i: str, b: dict):
     raise HTTPException(404, "Rolle nicht gefunden")
 @R.delete("/filaments/{i}")
 def fdel(i: str):
+    for r in load(FF, []):
+        if r["id"] == i and r.get("image"): (IMG / r["image"]).unlink(missing_ok=True)
     save(FF, [r for r in load(FF, []) if r["id"] != i]); return {"ok": True}
 
 @R.get("/filaments/export")
@@ -288,6 +293,118 @@ def tg_status(): return TB.status()
 def tg_test():
     if not TB.status()["enabled"]: raise HTTPException(400, "Bot ist nicht aktiv (Token und erlaubte IDs setzen)")
     TB.notify("✅ Testnachricht von hAI.3DDir"); return {"ok": True}
+
+# ---- Bilder, Barcode, Druckverlauf, KI ----
+from starlette.concurrency import run_in_threadpool
+def set_image(fid, data, ct="image/jpeg"):
+    ext = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp"}.get(ct)
+    if not ext: raise HTTPException(400, "Nur JPG, PNG oder WebP")
+    if len(data) > 6 * 1048576: raise HTTPException(413, "Bild größer als 6 MB")
+    l = load(FF, []); r = next((x for x in l if x["id"] == fid), None)
+    if not r: raise HTTPException(404, "Rolle nicht gefunden")
+    if r.get("image"): (IMG / r["image"]).unlink(missing_ok=True)
+    r["image"] = f"{fid}.{ext}"; r["img_ts"] = int(time.time()); (IMG / r["image"]).write_bytes(data); save(FF, l); return r
+@R.post("/filaments/{i}/image")
+async def img_set(i: str, file: UploadFile = File(...)): return set_image(i, await file.read(), file.content_type)
+@R.delete("/filaments/{i}/image")
+def img_del(i: str):
+    l = load(FF, [])
+    for r in l:
+        if r["id"] == i and r.get("image"): (IMG / r["image"]).unlink(missing_ok=True); r.pop("image"); r.pop("img_ts", None)
+    save(FF, l); return {"ok": True}
+@R.get("/filaments/{i}/image")
+def img_get(i: str):
+    r = next((x for x in load(FF, []) if x["id"] == i), None)
+    if not r or not r.get("image"): raise HTTPException(404, "Kein Bild")
+    return FileResponse(IMG / r["image"])
+def find_barcode(code):
+    c = str(code).strip().lstrip("0")
+    return next((r for r in load(FF, []) if c and str(r.get("barcode", "")).strip().lstrip("0") == c), None)
+@R.get("/filaments/barcode/{code}")
+def fbar(code: str): return find_barcode(code)
+@R.get("/prints")
+def prints_list(filament_id: str = ""):
+    return [p for p in load(PF, []) if not filament_id or p["filament_id"] == filament_id][::-1]
+@R.post("/prints")
+def print_add(b: dict):
+    fid = str(b.get("filament_id", "")); g = float(b.get("grams") or 0)
+    if g <= 0: raise HTTPException(400, "Gramm müssen größer als 0 sein")
+    l = load(FF, []); r = next((x for x in l if x["id"] == fid), None)
+    if not r: raise HTTPException(404, "Rolle nicht gefunden")
+    prev = r["weight_remaining"]; r["weight_remaining"] = max(0.0, round(prev - g, 1)); save(FF, l); TB.low(r, prev)
+    p = {"id": uuid.uuid4().hex[:8], "filament_id": fid, "grams": g, "name": str(b.get("name") or "")[:80], "file": str(b.get("file") or "")[:300], "ts": time.time()}
+    save(PF, load(PF, []) + [p]); return {"print": p, "remaining": r["weight_remaining"]}
+@R.delete("/prints/{i}")
+def print_del(i: str):
+    L = load(PF, []); p = next((x for x in L if x["id"] == i), None)
+    if not p: raise HTTPException(404, "Buchung nicht gefunden")
+    l = load(FF, [])
+    for r in l:
+        if r["id"] == p["filament_id"]: r["weight_remaining"] = round(r["weight_remaining"] + p["grams"], 1)
+    save(FF, l); save(PF, [x for x in L if x is not p]); return {"ok": True}
+@R.get("/ai")
+def ai_status(): return {"enabled": EX.enabled(), "model": EX.MODEL}
+@R.post("/ai/label")
+async def ai_label(file: UploadFile = File(...)):
+    raw = await file.read()
+    if len(raw) > 5 * 1048576: raise HTTPException(413, "Bild größer als 5 MB")
+    mt = file.content_type if file.content_type in ("image/jpeg", "image/png", "image/webp", "image/gif") else "image/jpeg"
+    try: return await run_in_threadpool(EX.ai_label, raw, mt)
+    except ValueError as e: raise HTTPException(400, str(e))
+@R.post("/estimate")
+async def estimate(b: dict):
+    p = safe(str(b.get("path", "")))
+    try: return await run_in_threadpool(EX.estimate, p, float(b.get("infill") or 15), str(b.get("material") or "PLA"))
+    except ValueError as e: raise HTTPException(400, str(e))
+
+# ---- Backup der Filament-DB ----
+def make_backup():
+    tmp = tempfile.NamedTemporaryFile(suffix=".zip", delete=False); tmp.close()
+    with zipfile.ZipFile(tmp.name, "w", zipfile.ZIP_DEFLATED) as z:
+        for f in (FF, PF):
+            if f.exists(): z.write(f, f.name)
+        for f in IMG.glob("*"): z.write(f, "img/" + f.name)
+    return tmp.name
+@R.get("/backup")
+def backup_dl():
+    p = make_backup()
+    return FileResponse(p, filename=f"hai3ddir-filamente-{time.strftime('%Y%m%d')}.zip", media_type="application/zip", background=BackgroundTask(os.unlink, p))
+@R.post("/backup/restore")
+async def backup_restore(file: UploadFile = File(...)):
+    try: z = zipfile.ZipFile(io.BytesIO(await file.read()))
+    except Exception: raise HTTPException(400, "Keine gültige ZIP-Datei")
+    try:
+        if not isinstance(json.loads(z.read("filaments.json")), list): raise ValueError
+    except Exception: raise HTTPException(400, "filaments.json fehlt oder ist ungültig")
+    if FF.exists(): shutil.copy(FF, FF.with_name("filaments.json.bak"))
+    for n in z.namelist():
+        if n in ("filaments.json", "prints.json"): (DATA / n).write_bytes(z.read(n))
+        elif n.startswith("img/") and n[4:] and "/" not in n[4:] and ".." not in n: (IMG / n[4:]).write_bytes(z.read(n))
+    return {"ok": True}
+
+# ---- MCP ----
+from fastapi.responses import JSONResponse
+from starlette.concurrency import run_in_threadpool
+@app.post("/mcp")
+async def mcp_endpoint(r: Request):
+    if r.headers.get("origin"): return JSONResponse({"error": "Origin not allowed"}, 403)
+    tok = MCP.auth(r.headers.get("authorization", ""))
+    if not tok: return JSONResponse({"error": "Unauthorized"}, 401, headers={"WWW-Authenticate": 'Bearer realm="hAI.3DDir"'})
+    try: body = await r.json()
+    except Exception: return JSONResponse({"jsonrpc": "2.0", "id": None, "error": {"code": -32700, "message": "Parse error"}}, 400)
+    out = await run_in_threadpool(MCP.handle, body, tok)
+    return Response(status_code=202) if out is None else JSONResponse(out)
+@app.get("/mcp")
+def mcp_get(): return JSONResponse({"error": "Use POST"}, 405, headers={"Allow": "POST"})
+@R.get("/mcp")
+def mcp_info(): return {"env": bool(os.getenv("MCP_TOKEN")), "tokens": [{k: t.get(k) for k in ("id", "name", "ro", "created", "used")} for t in MCP.tokens()]}
+@R.post("/mcp/tokens")
+def mcp_new(b: dict):
+    sec = "hai_" + secrets.token_urlsafe(32); L = MCP.tokens()
+    L.append({"id": uuid.uuid4().hex[:8], "name": str(b.get("name") or "Agent")[:40], "ro": bool(b.get("ro")), "hash": MCP._h(sec), "created": time.time()})
+    save(MCP._tf(), L); return {"token": sec}
+@R.delete("/mcp/tokens/{i}")
+def mcp_del(i: str): save(MCP._tf(), [t for t in MCP.tokens() if t["id"] != i]); return {"ok": True}
 
 app.include_router(A); app.include_router(R)
 app.mount("/", StaticFiles(directory=Path(__file__).parent / "static", html=True))
