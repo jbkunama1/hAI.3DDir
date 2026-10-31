@@ -40,22 +40,38 @@
 
 ### 🎨 Filament-Management
 - **Detaillierte Verwaltung**: Marke, Material, Farbe, Gewicht
-- **Verbrauchstracking**: Gesamtgewicht vs. Restgewicht
-- **Import/Export**: CSV und JSON Formate
+- **Preis & Datum**: Preis pro kg und Anschaffungsdatum pro Rolle
+- **Kosten-Tracking**: Automatische Berechnung der Druckkosten
+- **Verbrauchstracking**: Gesamtgewicht vs. Restgewicht mit Restwert
+- **Import/Export**: CSV und JSON Formate (inkl. Preis/Datum)
 - **Benutzerdefinierte Kategorien und Notizen**
 - **Barcode-Scanner**: Kamera oder Handscanner support
 - **Foto-Management**: Pro Rolle ein Bild
 - **KI-Scan**: Foto vom Etikett füllt Felder automatisch
 - **Druck-Verlauf**: Verbrauch pro Druckauftrag mit Rückgängig machen
+- **Kostendialog**: Investiert vs. Restwert, monatliche Übersicht
+- **MCP-Integration**: Kosten-Summary per API aufrufbar
+
+### 📊 Dateiansicht
+- **Darstellungsmodi**: 
+  - **Nur Symbole**: Schnelle Dateiliste ohne Vorschau
+  - **3D-Thumbnails**: Browser-generierte 3D-Vorschauen für STL/3MF/OBJ
+  - **Slicer-Daten**: Druckzeit, Gewicht, Schichthöhe aus G-Code/3MF
+- **Slicer-Info**: Automatische Extraktion von Metadaten aus 3MF/G-Code
+- **Cache-System**: Lokaler Cache für schnelle Wiederverwendung
+- **Thumbnail-Generation**: 3D-Dateien bis 20 MB gerendert im Browser
 
 ### 🛠️ Admin-Funktionen
 - **Statistiken**: Dateianzahl, Speicherbelegung, Upload-Metriken
 - **Theme-Konfiguration**: 5 verschiedene Designs
 - **Sicherheit**: Passwort, Rate-Limit, Path-Traversal-Schutz
 - **Einstellungen**: Upload-Limits, erlaubte Dateiendungen
+- **Dateiansicht**: Auswahl von Symbole, 3D-Thumbnails, Slicer-Daten
+- **Slicer-Cache**: Automatische Bereinigung der Vorschau-Caches
 - **Benachrichtigungen**: Telegram-Integration
-- **MCP-Server**: Bearer-Token für KI-Agenten
+- **MCP-Server**: Bearer-Token für KI-Agenten (Token-Management)
 - **LLM-Konfiguration**: OpenAI-kompatible API für KI-Scan
+- **Backup/Restore**: Komplette Sicherung aller Einstellungen und Daten
 
 ### 🤖 Telegram-Bot
 - **Datei-Explorer**: Ordner durchklicken und senden (bis 50 MB)
@@ -378,8 +394,20 @@ Erweitere die erlaubten Dateitypen im Admin-Tab:
 ### In Entwicklung (Q1 2024)
 - [x] 🧵 **Druck-Spezifische Filament-Abbuchung**: Verbrauch pro Druckauftrag tracken
 - [x] 📊 **Detaillierte Druck-Statistiken**: Druckdauer, Materialverbrauch, Erfolgswahrscheinlichkeit
-- [ ] 🔗 **Integration mit Cura/PrusaSlicer**: Direkter Import von Druckkonfigurationen
+- [x] 🔗 **Integration mit Cura/PrusaSlicer**: Direkter Import von Druckkonfigurationen
 - [x] ☁️ **Cloud-Backup**: Automatisches Backup der Filament-Daten
+
+### ✅ Realisiert (Q1 2024)
+- [x] 💰 **Filament-Preisverwaltung**: Preis pro kg und Anschaffungsdatum pro Rolle
+- [x] 🧮 **Automatische Kostenberechnung**: Druckkosten basierend auf Verbrauch und Preis
+- [x] 📊 **Kostendialog**: Gesamtübersicht Investition vs. Restwert
+- [x] 📈 **Monatliche Kostenaufschlüsselung**: Nach Monat und Material gruppiert
+- [x] 🔄 **CSV-Import/Export**: Vollständige Datensicherung inklusive Preis/Datum
+- [x] 🎛️ **Wählbare Dateiansicht**: Symbole, 3D-Thumbnails, Slicer-Daten
+- [x] 🔍 **Slicer-Meta-Extraktion**: Druckzeit, Gewicht, Schichthöhe aus 3MF/G-Code
+- [x] 🗄️ **Slicer-Cache**: Lokale Cache-System für schnelle Wiederverwendung
+- [x] 🤖 **MCP-Integration**: Kosten-Summary und Slicer-Info für externe Systeme
+- [x] 📱 **Live-Kostenanzeige**: Echtzeitberechnung im Buchungsdialog
 
 ### Geplant (Q2 2024)
 - [ ] 🤖 **KI-gestützte Datei-Organisation**: Automatische Kategorisierung nach Inhalten
