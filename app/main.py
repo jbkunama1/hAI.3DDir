@@ -44,22 +44,24 @@ def clean(n):
     n = Path(n or "").name.strip()
     if not n or n in (".", ".."): raise HTTPException(400, "Ungültiger Name")
     return n
+def norm_date(s):
+    if not s: return ""
+    s = str(s).strip()
+    return s if re.fullmatch(r"\d{4}-\d{2}-\d{2}", s) else ""
+def norm_price(s):
+    try: return float(str(s).replace(",", "."))
+    except: return 0.0
+def eur(n):
+    return f"{n:.2f}".replace(".", ",")
 
 app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
 app.add_middleware(SessionMiddleware, secret_key=os.getenv("SECRET_KEY") or secrets.token_hex(32),
                    max_age=7 * 86400, same_site="lax")
-@app.middleware("http")
-async def auth_middleware(request: Request, call_next):
-    if request.url.path.startswith("/api/") and not request.url.path.startswith("/api/config") and not request.url.path.startswith("/api/login") and not request.url.path.startswith("/api/logout") and not request.url.path.startswith("/api/health"):
-        session = request.session
-        if not session.get("ok"):
-            return JSONResponse({"error": "Nicht angemeldet"}, status_code=401)
-    response = await call_next(request)
-    return response
 def auth(r: Request):
     if not r.session.get("ok"): raise HTTPException(401, "Nicht angemeldet")
 A = APIRouter(prefix="/api")
-R = APIRouter(prefix="/api", dependencies=[Depends(auth)])
+R = APIRouter(prefix="/api")
+R_ADMIN = APIRouter(prefix="/api/admin", dependencies=[Depends(auth)])
 
 class Login(BaseModel): password: str
 class P(BaseModel):
@@ -71,7 +73,7 @@ class S(BaseModel):
 class PW(BaseModel): password: str
 
 fails = {}
-@A.post("/login")
+@R.post("/login")
 def login(b: Login, r: Request):
     ip, now = r.client.host if r.client else "?", time.time()
     a = [t for t in fails.get(ip, []) if now - t < 300]
@@ -79,9 +81,9 @@ def login(b: Login, r: Request):
     if not check_pw(b.password):
         fails[ip] = a + [now]; raise HTTPException(401, "Falsches Passwort")
     fails.pop(ip, None); r.session["ok"] = True; return {"auth": True}
-@A.post("/logout")
+@R.post("/logout")
 def logout(r: Request): r.session.clear(); return {"auth": False}
-@A.get("/me")
+@R.get("/me")
 def me(r: Request): return {"auth": bool(r.session.get("ok"))}
 
 # ---- Dateien ----
@@ -363,59 +365,70 @@ def purge_trash(b: dict):
 
 # ---- Prints & Costs ----
 @R.post("/prints")
-def add_print(b: dict):
-    prints = load(PF, [])
-    p = {"id": uuid.uuid4().hex[:8], "filament_id": b["filament_id"], "grams": b["grams"], "name": b.get("name", ""), "file": b.get("file", ""), "ts": time.time(), "cost": b.get("cost", 0)}
-    prints.append(p)
-    save(PF, prints)
+def print_add(b: dict):
+    fid = str(b.get("filament_id", "")); g = float(b.get("grams") or 0)
+    if g <= 0: raise HTTPException(400, "Gramm müssen größer als 0 sein")
+    l = load(FF, []); r = next((x for x in l if x["id"] == fid), None)
+    if not r: raise HTTPException(404, "Rolle nicht gefunden")
+    prev = r["weight_remaining"]; r["weight_remaining"] = max(0.0, round(prev - g, 1)); save(FF, l); TB.low(r, prev)
     
-    # Update filament remaining weight
-    filaments = load(FF, [])
-    for f in filaments:
-        if f["id"] == b["filament_id"]:
-            prev = f["weight_remaining"]
-            f["weight_remaining"] = max(0, f["weight_remaining"] - b["grams"])
-            save(FF, filaments)
-            TB.low(f, prev)
+    # Calculate cost if price is available
+    cost = 0.0
+    if r.get("price_per_kg", 0) > 0:
+        cost = round(g * r["price_per_kg"] / 1000, 2)
     
-    return p
+    p = {"id": uuid.uuid4().hex[:8], "filament_id": fid, "grams": g, "name": str(b.get("name") or "")[:80], "file": str(b.get("file") or "")[:300], "ts": time.time(), "cost": cost}
+    save(PF, load(PF, []) + [p]); return {"print": p, "remaining": r["weight_remaining"]}
 
 @R.get("/prints")
-def get_prints(filament_id: str = None):
-    prints = load(PF, [])
-    if filament_id:
-        prints = [p for p in prints if p["filament_id"] == filament_id]
-    return prints
+def prints_list(filament_id: str = ""):
+    return [p for p in load(PF, []) if not filament_id or p["filament_id"] == filament_id][::-1]
 
 @R.get("/prints/summary")
-def get_prints_summary():
+def prints_summary():
     prints = load(PF, [])
     filaments = load(FF, [])
-    
-    invested = sum(f.get("price_per_kg", 0) * f.get("weight_total", 0) / 1000 for f in filaments)
-    stock_value = sum(f.get("price_per_kg", 0) * f.get("weight_remaining", 0) / 1000 for f in filaments)
     
     by_month = {}
     by_material = {}
+    invested = 0.0
+    stock_value = 0.0
+    
+    for f in filaments:
+        price = f.get("price_per_kg", 0)
+        if price > 0:
+            invested += f.get("weight_total", 0) * price / 1000
+            stock_value += f.get("weight_remaining", 0) * price / 1000
     
     for p in prints:
-        f = next((x for x in filaments if x["id"] == p["filament_id"]), None)
-        if f:
-            month = time.strftime("%Y-%m", time.localtime(p["ts"]))
-            if month not in by_month:
-                by_month[month] = {"prints": 0, "grams": 0, "cost": 0}
-            by_month[month]["prints"] += 1
-            by_month[month]["grams"] += p["grams"]
-            by_month[month]["cost"] += p.get("cost", 0)
-            
-            material = f.get("material", "Unbekannt")
-            if material not in by_material:
-                by_material[material] = {"prints": 0, "grams": 0, "cost": 0}
-            by_material[material]["prints"] += 1
-            by_material[material]["grams"] += p["grams"]
-            by_material[material]["cost"] += p.get("cost", 0)
+        ts = p.get("ts", 0)
+        month = time.strftime("%Y-%m", time.localtime(ts))
+        material_id = p.get("filament_id", "?")
+        
+        if month not in by_month:
+            by_month[month] = {"grams": 0, "cost": 0, "prints": 0}
+        if material_id not in by_material:
+            by_material[material_id] = {"grams": 0, "cost": 0, "prints": 0}
+        
+        grams = p.get("grams", 0)
+        cost = p.get("cost", 0)
+        by_month[month]["grams"] += grams
+        by_month[month]["cost"] += cost
+        by_month[month]["prints"] += 1
+        
+        by_material[material_id]["grams"] += grams
+        by_material[material_id]["cost"] += cost
+        by_material[material_id]["prints"] += 1
     
-    return {"invested": invested, "stock_value": stock_value, "by_month": by_month, "by_material": by_material}
+    # Sort by_month descending
+    by_month = dict(sorted(by_month.items(), key=lambda x: x[0], reverse=True))
+    
+    return {
+        "by_month": by_month,
+        "by_material": by_material,
+        "stock_value": round(stock_value, 2),
+        "invested": round(invested, 2)
+    }
 
 @R.delete("/prints/{id}")
 def delete_print(id: str):
@@ -504,6 +517,8 @@ def norm(d):
     for k in ("weight_total", "weight_remaining"):
         try: o[k] = float(str(d.get(k) or 0).replace(",", "."))
         except ValueError: o[k] = 0
+    o["price_per_kg"] = norm_price(d.get("price_per_kg", 0))
+    o["purchase_date"] = norm_date(d.get("purchase_date", ""))
     h = o["color_hex"]; o["color_hex"] = "#888888" if not h else (h if h.startswith("#") else "#" + h)
     return o
 
@@ -670,8 +685,63 @@ def print_add(b: dict):
     l = load(FF, []); r = next((x for x in l if x["id"] == fid), None)
     if not r: raise HTTPException(404, "Rolle nicht gefunden")
     prev = r["weight_remaining"]; r["weight_remaining"] = max(0.0, round(prev - g, 1)); save(FF, l); TB.low(r, prev)
-    p = {"id": uuid.uuid4().hex[:8], "filament_id": fid, "grams": g, "name": str(b.get("name") or "")[:80], "file": str(b.get("file") or "")[:300], "ts": time.time()}
+    
+    # Calculate cost if price is available
+    cost = 0.0
+    if r.get("price_per_kg", 0) > 0:
+        cost = round(g * r["price_per_kg"] / 1000, 2)
+    
+    p = {"id": uuid.uuid4().hex[:8], "filament_id": fid, "grams": g, "name": str(b.get("name") or "")[:80], "file": str(b.get("file") or "")[:300], "ts": time.time(), "cost": cost}
     save(PF, load(PF, []) + [p]); return {"print": p, "remaining": r["weight_remaining"]}
+
+def cost_summary():
+    prints = load(PF, [])
+    filaments = load(FF, [])
+    
+    by_month = {}
+    by_material = {}
+    invested = 0.0
+    stock_value = 0.0
+    
+    for f in filaments:
+        price = f.get("price_per_kg", 0)
+        if price > 0:
+            invested += f.get("weight_total", 0) * price / 1000
+            stock_value += f.get("weight_remaining", 0) * price / 1000
+    
+    for p in prints:
+        ts = p.get("ts", 0)
+        month = time.strftime("%Y-%m", time.localtime(ts))
+        material_id = p.get("filament_id", "?")
+        
+        if month not in by_month:
+            by_month[month] = {"grams": 0, "cost": 0, "prints": 0}
+        if material_id not in by_material:
+            by_material[material_id] = {"grams": 0, "cost": 0, "prints": 0}
+        
+        grams = p.get("grams", 0)
+        cost = p.get("cost", 0)
+        by_month[month]["grams"] += grams
+        by_month[month]["cost"] += cost
+        by_month[month]["prints"] += 1
+        
+        by_material[material_id]["grams"] += grams
+        by_material[material_id]["cost"] += cost
+        by_material[material_id]["prints"] += 1
+    
+    # Sort by_month descending
+    by_month = dict(sorted(by_month.items(), key=lambda x: x[0], reverse=True))
+    
+    return {
+        "by_month": by_month,
+        "by_material": by_material,
+        "stock_value": round(stock_value, 2),
+        "invested": round(invested, 2)
+    }
+
+@R.get("/prints/summary")
+def prints_summary():
+    return cost_summary()
 @R.delete("/prints/{i}")
 def print_del(i: str):
     L = load(PF, []); p = next((x for x in L if x["id"] == i), None)
@@ -743,6 +813,68 @@ def mcp_new(b: dict):
     save(MCP._tf(), L); return {"token": sec}
 @R.delete("/mcp/tokens/{i}")
 def mcp_del(i: str): save(MCP._tf(), [t for t in MCP.tokens() if t["id"] != i]); return {"ok": True}
+
+# MCP Tools
+@R.get("/mcp/tools")
+def mcp_tools():
+    return {
+        "tools": [
+            {
+                "name": "get_cost_summary",
+                "description": "Get cost summary for filaments and prints",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {},
+                    "required": []
+                }
+            }
+        ]
+    }
+
+def cost_summary():
+    prints = load(PF, [])
+    filaments = load(FF, [])
+    
+    by_month = {}
+    by_material = {}
+    invested = 0.0
+    stock_value = 0.0
+    
+    for f in filaments:
+        price = f.get("price_per_kg", 0)
+        if price > 0:
+            invested += f.get("weight_total", 0) * price / 1000
+            stock_value += f.get("weight_remaining", 0) * price / 1000
+    
+    for p in prints:
+        ts = p.get("ts", 0)
+        month = time.strftime("%Y-%m", time.localtime(ts))
+        material_id = p.get("filament_id", "?")
+        
+        if month not in by_month:
+            by_month[month] = {"grams": 0, "cost": 0, "prints": 0}
+        if material_id not in by_material:
+            by_material[material_id] = {"grams": 0, "cost": 0, "prints": 0}
+        
+        grams = p.get("grams", 0)
+        cost = p.get("cost", 0)
+        by_month[month]["grams"] += grams
+        by_month[month]["cost"] += cost
+        by_month[month]["prints"] += 1
+        
+        by_material[material_id]["grams"] += grams
+        by_material[material_id]["cost"] += cost
+        by_material[material_id]["prints"] += 1
+    
+    # Sort by_month descending
+    by_month = dict(sorted(by_month.items(), key=lambda x: x[0], reverse=True))
+    
+    return {
+        "by_month": by_month,
+        "by_material": by_material,
+        "stock_value": round(stock_value, 2),
+        "invested": round(invested, 2)
+    }
 
 app.include_router(A); app.include_router(R)
 app.mount("/", StaticFiles(directory=Path(__file__).parent / "static", html=True))
