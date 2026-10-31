@@ -115,7 +115,7 @@ async function loadSlicerInfo(path,card){
         if(r.has){
             const infoDiv=card.querySelector('.si');
             if(r.image){
-                infoDiv.innerHTML=`<img src="/api/slicer/image?path=${encodeURIComponent(path)}&v=${mtime}" style="max-width:100px;max-height:100px;">`;
+                infoDiv.innerHTML=`<img src="/api/slicer/image?path=${encodeURIComponent(path)}" style="max-width:100px;max-height:100px;">`;
             }else{
                 const parts=[];
                 if(r.data.time_s) parts.push(`⏱ ${formatTime(r.data.time_s)}`);
@@ -202,5 +202,8 @@ function observeElements() {
 
 // Start
 const start=()=>{document.getElementById("login").hidden=true;document.getElementById("app").hidden=false;loadFiles();loadFil();loadAdm()};
-run(()=>{showLogin();document.getElementById("lf").onsubmit=async e=>{e.preventDefault();try{await api("/login",{method:"POST",body:JSON.stringify({password:document.getElementById("pw").value})});start()}catch{alert("Falsches Passwort")}}})();
+document.addEventListener("DOMContentLoaded", () => {
+    showLogin();
+    document.getElementById("lf").onsubmit=async e=>{e.preventDefault();try{await api("/login",{method:"POST",body:JSON.stringify({password:document.getElementById("pw").value})});start()}catch{alert("Falsches Passwort")}}});
+});
 </script></body></html>

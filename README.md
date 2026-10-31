@@ -69,7 +69,7 @@
 - **Dateiansicht**: Auswahl von Symbole, 3D-Thumbnails, Slicer-Daten
 - **Slicer-Cache**: Automatische Bereinigung der Vorschau-Caches
 - **Benachrichtigungen**: Telegram-Integration
-- **MCP-Server**: Bearer-Token für KI-Agenten
+- **MCP-Server**: Bearer-Token für KI-Agenten (Token-Management)
 - **LLM-Konfiguration**: OpenAI-kompatible API für KI-Scan
 - **Backup/Restore**: Komplette Sicherung aller Einstellungen und Daten
 
@@ -394,8 +394,20 @@ Erweitere die erlaubten Dateitypen im Admin-Tab:
 ### In Entwicklung (Q1 2024)
 - [x] 🧵 **Druck-Spezifische Filament-Abbuchung**: Verbrauch pro Druckauftrag tracken
 - [x] 📊 **Detaillierte Druck-Statistiken**: Druckdauer, Materialverbrauch, Erfolgswahrscheinlichkeit
-- [ ] 🔗 **Integration mit Cura/PrusaSlicer**: Direkter Import von Druckkonfigurationen
+- [x] 🔗 **Integration mit Cura/PrusaSlicer**: Direkter Import von Druckkonfigurationen
 - [x] ☁️ **Cloud-Backup**: Automatisches Backup der Filament-Daten
+
+### ✅ Realisiert (Q1 2024)
+- [x] 💰 **Filament-Preisverwaltung**: Preis pro kg und Anschaffungsdatum pro Rolle
+- [x] 🧮 **Automatische Kostenberechnung**: Druckkosten basierend auf Verbrauch und Preis
+- [x] 📊 **Kostendialog**: Gesamtübersicht Investition vs. Restwert
+- [x] 📈 **Monatliche Kostenaufschlüsselung**: Nach Monat und Material gruppiert
+- [x] 🔄 **CSV-Import/Export**: Vollständige Datensicherung inklusive Preis/Datum
+- [x] 🎛️ **Wählbare Dateiansicht**: Symbole, 3D-Thumbnails, Slicer-Daten
+- [x] 🔍 **Slicer-Meta-Extraktion**: Druckzeit, Gewicht, Schichthöhe aus 3MF/G-Code
+- [x] 🗄️ **Slicer-Cache**: Lokale Cache-System für schnelle Wiederverwendung
+- [x] 🤖 **MCP-Integration**: Kosten-Summary und Slicer-Info für externe Systeme
+- [x] 📱 **Live-Kostenanzeige**: Echtzeitberechnung im Buchungsdialog
 
 ### Geplant (Q2 2024)
 - [ ] 🤖 **KI-gestützte Datei-Organisation**: Automatische Kategorisierung nach Inhalten
