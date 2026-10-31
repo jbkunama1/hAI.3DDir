@@ -110,9 +110,8 @@ const observer=new IntersectionObserver((entries,obs)=>{
     });
 },{rootMargin:'200px'});
 async function loadSlicerInfo(path,card){
-    const mtime=card.querySelector('.si').dataset.v||'';
     try{
-        const r=await api(`/slicer?path=${encodeURIComponent(path)}&v=${mtime}`);
+        const r=await api(`/slicer?path=${encodeURIComponent(path)}`);
         if(r.has){
             const infoDiv=card.querySelector('.si');
             if(r.image){
