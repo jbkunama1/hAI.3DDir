@@ -202,8 +202,9 @@ function observeElements() {
 
 // Start
 const start=()=>{document.getElementById("login").hidden=true;document.getElementById("app").hidden=false;loadFiles();loadFil();loadAdm()};
-document.addEventListener("DOMContentLoaded", () => {
+// Initialize
+window.addEventListener('DOMContentLoaded', () => {
     showLogin();
-    document.getElementById("lf").onsubmit=async e=>{e.preventDefault();try{await api("/login",{method:"POST",body:JSON.stringify({password:document.getElementById("pw").value})});start()}catch{alert("Falsches Passwort")}}});
+    document.getElementById("lf").onsubmit=async e=>{e.preventDefault();try{await api("/login",{method:"POST",body:JSON.stringify({password:document.getElementById("pw").value})});start()}catch{alert("Falsches Passwort")}}};
 });
 </script></body></html>
