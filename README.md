@@ -53,13 +53,89 @@
 - **MCP-Integration**: Kosten-Summary per API aufrufbar
 
 ### 📊 Dateiansicht
-- **Darstellungsmodi**: 
+- **Darstellungsmodi**:
   - **Nur Symbole**: Schnelle Dateiliste ohne Vorschau
   - **3D-Thumbnails**: Browser-generierte 3D-Vorschauen für STL/3MF/OBJ
   - **Slicer-Daten**: Druckzeit, Gewicht, Schichthöhe aus G-Code/3MF
 - **Slicer-Info**: Automatische Extraktion von Metadaten aus 3MF/G-Code
 - **Cache-System**: Lokaler Cache für schnelle Wiederverwendung
 - **Thumbnail-Generation**: 3D-Dateien bis 20 MB gerendert im Browser
+
+### 🔌 MCP-Server
+- **JSON-RPC 2.0 Protocol**: RESTful MCP-Server mit Streamable HTTP
+- **Bearer Authentication**: JWT-like Token-basierte Authentifizierung
+- **Vollständige API**: Alle Datei-, Filament- und System-Operationen
+- **Tools**: ~25+ Operationen für Dateiverwaltung, Filament-Tracking und Slicing
+- **Token Management**: Admin-UI für Token-Generierung und -Verwaltung
+- **Read-Only Tokens**: Sicherheitskonzept mit Readonly-Berechtigungen
+- **Rate Limiting**: Schutz vor API-Überlastung
+
+#### Verfügbare MCP-Tools:
+
+**Dateimanagement** (~14 Tools):
+- `list_directory`: Verzeichnisse und Dateien auflisten
+- `search_files`: Suche über den gesamten Share
+- `get_file_info`: Metadaten abrufen
+- `read_file`: Dateien lesen (text oder base64, max 5MB)
+- `write_file`: Dateien erstellen/überschreiben
+- `create_folder`: Ordner erstellen
+- `move_item`: Dateien/Ordner verschieben
+- `rename_item`: Umbenennen
+- `delete_item`: Löschen (in Papierkorb)
+- `list_trash`: Papierkorb auflisten
+- `restore_trash`: Elemente wiederherstellen
+
+**Filament-Management** (~8 Tools):
+- `list_filaments`: Rollen auflisten
+- `add_filament`: Rolle hinzufügen
+- `update_filament`: Rolle aktualisieren
+- `adjust_filament_weight`: Gewicht anpassen (Druckbuchung)
+- `delete_filament`: Rolle löschen
+- `find_filament_by_barcode`: Per Barcode suchen
+- `log_print`: Druck buchen
+- `list_prints`: Druckhistorie aufrufen
+- `estimate_filament_usage`: Verbrauch schätzen
+
+**Slicer & Kosten**:
+- `get_cost_summary`: Kostenübersicht
+- `get_slicer_info`: Slicer-Metadaten extrahieren
+- `estimate_filament_usage`: Füllgrad-basierte Schätzung
+
+#### MCP-Konfiguration:
+
+**Environment Variables**:
+```bash
+MCP_TOKEN="dein-secret-token"  # Für globale Tokens
+```
+
+**Token Management via Admin UI**:
+1. Admin-Tab öffnen → MCP-Server
+2. "Token erzeugen" klicken
+3. Token kopieren und in deinen MCP-Client eintragen
+
+**Beispiel (Python)**:
+```python
+import json, requests
+token = "dein-generated-token"
+headers = {"Authorization": f"Bearer {token}"}
+
+# MCP initialize
+r = requests.post("http://localhost:8080/mcp", json={
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "initialize",
+    "params": {"protocolVersion": "2025-06-18"}
+}, headers=headers)
+print(r.json())
+
+# Tools abrufen
+r = requests.post("http://localhost:8080/mcp", json={
+    "jsonrpc": "2.0",
+    "id": 2,
+    "method": "tools/list"
+}, headers=headers)
+print(json.dumps(r.json(), indent=1))
+```
 
 ### 🛠️ Admin-Funktionen
 - **Statistiken**: Dateianzahl, Speicherbelegung, Upload-Metriken
@@ -482,4 +558,4 @@ python -m uvicorn app.main:app --reload
 
 ## 🏷️ Tags
 
-`#3D-Druck` `#File-Sharing` `#Docker` `#FastAPI` `#Selfhosted` `#NAS` `#Samba` `#Telegram` `#Webinterface` `#Filament-Management` `#Three.js` `#Vue.js`
+`#3D-Druck` `#File-Sharing` `#Docker` `#FastAPI` `#Selfhosted` `#NAS` `#Samba` `#Telegram` `#Webinterface` `#Filament-Management` `#Three.js` `#Vue.js` `#MCP-Server` `#JSON-RPC` `#LLM` `#OpenAI-Integration`

@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "hai3ddir": {
+      "command": "uvicorn",
+      "args": ["app.main:app", "--host", "0.0.0.0", "--port", "8080"],
+      "env": {
+        "MCP_TOKEN": "${MCP_TOKEN}",
+        "SECRET_KEY": "${SECRET_KEY}",
+        "ADMIN_PASSWORD": "${ADMIN_PASSWORD}",
+        "SHARE_PATH": "/share",
+        "DATA_DIR": "/data"
+      },
+      "cwd": "/srv"
+    }
+  }
+}

@@ -67,7 +67,7 @@ const esc=s=>s.replace(/[&<>"']/g,c=>({ '&': '&amp;', '<': '&lt;', '>': '&gt;', 
 const showLogin=()=>{document.getElementById("login").hidden=false;document.getElementById("app").hidden=true};
 const start=()=>{document.getElementById("login").hidden=true;document.getElementById("app").hidden=false;loadFiles();loadFil();loadAdm()};
 // Login
-document.getElementById("lf").onsubmit=async e=>{e.preventDefault();try{await api("/login",{method:"POST",body:JSON.stringify({password:document.getElementById("pw").value})});start()}catch{alert("Falsches Passwort")}};
+document.getElementById("lf").onsubmit=async e=>{e.preventDefault();try{await api("/login",{method:"POST",body:JSON.stringify({password:document.getElementById("pw").value})});toast("Angemeldet");start()}catch{alert("Falsches Passwort")}};
 document.getElementById("lo").onclick=async()=>{await api("/logout",{method:"POST"});showLogin()};
 // Files
 const thumbMaxMB=20;
