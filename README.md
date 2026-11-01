@@ -271,7 +271,7 @@ docker-compose up -d
 docker run -d \
   --name hai-3ddir \
   --network highfishNetwork \
-  -e ADMIN_PASSWORD="dein-passwort" \
+  -e ADMIN_PASSWORD="DEIN-SICHERES-PASSWORT" \
   -e SECRET_KEY="$(openssl rand -hex 32)" \
   -e SHARE_HOST_PATH="/pfad/zur/samba/freigabe" \
   -e PUID=1000 -e PGID=1000 \
@@ -284,7 +284,7 @@ docker run -d \
 
 | Variable | Standard | Beschreibung |
 |----------|----------|-------------|
-| `ADMIN_PASSWORD` | `changeme` | Admin Passwort (Änderung empfohlen!) |
+| `ADMIN_PASSWORD` | **Pflichtfeld** | Admin Passwort (muss gesetzt werden!) |
 | `SECRET_KEY` | Auto-generated | Session Secret (`openssl rand -hex 32`) |
 | `SHARE_HOST_PATH` | `/share` | Pfad zur Samba-Freigabe |
 | `PUID` / `PGID` | `1000` | Benutzer/Gruppe für Dateirechte |
@@ -305,10 +305,11 @@ docker run -d \
 ### 🔐 Sicherheitseinstellungen
 
 Nach Deployment **unbedingt**:
-1. **Admin-Passwort ändern** im Webinterface oder via `ADMIN_PASSWORD`
-2. **SECRET_KEY setzen** für sichere Sessions
-3. **Netzwerk-Isolation** nur notwendige Ports öffnen
-4. **Firewall-Regeln** für LAN- Zugriff konfigurieren
+1. **ADMIN_PASSWORD setzen** - ist ein Pflichtfeld, Start schlägt ohne es fehl!
+2. **SECRET_KEY setzen** für sichere Sessions (`openssl rand -hex 32`)
+3. **Admin-Passwort ändern** im Webinterface nach erstem Login
+4. **Netzwerk-Isolation** nur notwendige Ports öffnen
+5. **Firewall-Regeln** für LAN- Zugriff konfigurieren
 
 Nach einer Passwortänderung im Admin-Tab gilt das neue Passwort statt `ADMIN_PASSWORD`. Für HTTPS einen Reverse-Proxy davorsetzen.
 

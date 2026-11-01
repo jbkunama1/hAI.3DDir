@@ -34,7 +34,10 @@ def hpw(pw, salt=None):
 def check_pw(pw):
     h = settings()["pw_hash"]
     if h: return hmac.compare_digest(h, hpw(pw, h.split("$")[0]))
-    return hmac.compare_digest(pw.encode(), os.getenv("ADMIN_PASSWORD", "changeme").encode())
+    admin_pw = os.getenv("ADMIN_PASSWORD")
+    if not admin_pw:
+        raise HTTPException(500, "ADMIN_PASSWORD Environment Variable nicht gesetzt - ist ein Pflichtfeld!")
+    return hmac.compare_digest(pw.encode(), admin_pw.encode())
 
 def safe(rel=""):
     p = (ROOT / (rel or "").lstrip("/")).resolve()
@@ -89,14 +92,24 @@ def me(r: Request): return {"auth": bool(r.session.get("ok")), "session": dict(r
 @R.get("/debug/checkpw")
 def debug_checkpw(pw: str = ""):
     import os
-    result = check_pw(pw)
-    admin_pw = os.getenv("ADMIN_PASSWORD", "changeme")
-    expected = hmac.compare_digest(pw.encode(), admin_pw.encode())
+    admin_pw = os.getenv("ADMIN_PASSWORD")
+    has_admin_pw = bool(admin_pw)
+    expected = hmac.compare_digest(pw.encode(), admin_pw.encode()) if has_admin_pw else False
+    try:
+        result = check_pw(pw)
+    except HTTPException as e:
+        result = False
+        error_msg = str(e.detail)
+    else:
+        error_msg = "OK"
+    
     return {
         "check_pw_result": result,
         "expected_result": expected,
-        "admin_password_env": admin_pw,
-        "password_set": admin_pw != "changeme"
+        "admin_password_env": "***" if has_admin_pw else "NOT_SET",
+        "password_set": has_admin_pw,
+        "debug_info": error_msg,
+        "password_required": True
     }
 
 # ---- Dateien ----
