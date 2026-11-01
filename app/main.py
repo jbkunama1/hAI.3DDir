@@ -84,7 +84,20 @@ def login(b: Login, r: Request):
 @R.post("/logout")
 def logout(r: Request): r.session.clear(); return {"auth": False}
 @R.get("/me")
-def me(r: Request): return {"auth": bool(r.session.get("ok"))}
+def me(r: Request): return {"auth": bool(r.session.get("ok")), "session": dict(r.session)}
+
+@R.get("/debug/checkpw")
+def debug_checkpw(pw: str = ""):
+    import os
+    result = check_pw(pw)
+    admin_pw = os.getenv("ADMIN_PASSWORD", "changeme")
+    expected = hmac.compare_digest(pw.encode(), admin_pw.encode())
+    return {
+        "check_pw_result": result,
+        "expected_result": expected,
+        "admin_password_env": admin_pw,
+        "password_set": admin_pw != "changeme"
+    }
 
 # ---- Dateien ----
 @R.get("/list")
