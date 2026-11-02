@@ -1,0 +1,35 @@
+name: Apply reviewed repair and test
+on:
+  push:
+    branches: [main]
+    paths: [maintenance/repair.py]
+permissions:
+  contents: write
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - name: Require reviewed starting commit
+        run: test "$(git rev-parse HEAD^)" = 996b57d7935848a100887457f4475d4e6272866a
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: pip install fastapi python-multipart itsdangerous httpx
+      - run: python maintenance/repair.py
+      - run: python -m compileall -q app tests
+      - run: python -m unittest discover -s tests -v
+      - run: git diff --check
+      - name: Commit tested application changes without force
+        run: |
+          test "$(git ls-remote origin refs/heads/main | cut -f1)" = "$GITHUB_SHA"
+          git config user.name 'hAI maintenance'
+          git config user.email 'maintenance@localhost'
+          git add app/main.py app/static/index.html app/mcp_server.py
+          git commit -m 'Fix login and API authentication, deduplicate routes and connect slicer implementation'
+          git push origin HEAD:main
