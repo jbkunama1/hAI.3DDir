@@ -2,22 +2,26 @@
 
 FastAPI, Vanilla JavaScript und JSON-Persistenz für lokal eingebundene 3D-Druckdateien und Filamentrollen.
 
-## Gestaltung wiederhergestellt
+## Oberfläche und Bedienung
 
-Modern, Nacht, Bunt, Werkstatt und Galaxie verwenden wieder die ursprünglichen Paletten, Hintergründe und themenabhängigen Symbole aus 3db9b68. Rollenfarben, Füllstandsbalken, vorhandene Rollenfotos, Statistik-Karten und Breadcrumbs sind wieder angebunden. Der Login-v2 bleibt unverändert; design.css/design.js erweitern nur die Oberfläche.
+Fünf Original-Themes mit Hintergründen, Symbolen, Rollengrafiken, Füllstandsbalken, Fotos, Statistik-Karten und Breadcrumbs. Login-v2 bleibt unverändert; design.js und controls.js erweitern die Oberfläche.
 
-viewer.mjs lädt Three.js 0.160.0/Loader bei Bedarf von jsDelivr: STL/OBJ/3MF-Viewer mit Drehen, Zoom und Modellabmessungen; 3D-Thumbnails mit IndexedDB-Cache. WebGL und Internetzugang sind dafür erforderlich. Optionale Vorschaufehler dürfen den Login nicht blockieren. Dateiansichten: Symbole, 3D-Thumbnails und Slicer-Daten. Thumbnail-Limit im Adminbereich einstellbar. Dies ist kein vollständiger Rollback: Mehrfachauswahl, Batchaktionen und weitere alte Bedienfunktionen sind noch nicht wiederhergestellt.
+Wieder verfügbar: Mehrfachauswahl per Checkbox, Strg/Cmd und Shift-Bereich, alle/keine, Verschieben mit Zielordnerwahl, ZIP und Löschen; neue Ordner; Drag-and-drop-Verschieben und Upload mit Fortschritt; Papierkorb mit Wiederherstellen, endgültigem Löschen und Leeren; Rollen bearbeiten/löschen und CSV/JSON-Import/-Export. Import hängt standardmäßig an; Ersetzen verlangt Bestätigung. Escape beendet die Auswahl.
 
-## Betrieb
+STL/OBJ/3MF-Viewer und 3D-Thumbnails verwenden WebGL und bei Bedarf Three.js 0.160.0 von jsDelivr. Symbole, Thumbnails und Slicer-Daten bleiben getrennte Ansichten. Optionale Vorschaufehler dürfen den Login nicht blockieren.
 
-Vorhandenes docker-compose.yml, highfishNetwork, /share und persistentes /data verwenden. Samba auf dem Host mounten; SHARE_HOST_PATH, ADMIN_PASSWORD, stabilen SECRET_KEY und PUID/PGID setzen. Ein gespeicherter pw_hash ersetzt ADMIN_PASSWORD; Redeploy setzt kein Passwort zurück. Volumes nicht löschen.
+## Dateiaktionen und Grenzen
 
-Nach grünem GitHub-Test/Build Image neu ziehen und Container mit unveränderten Volumes neu erstellen. UI login-v2 und /build.json zeigen die Image-Revision; data-design=restored-v1 kennzeichnet die Gestaltung. Details: docs/LOGIN.md. Git-Push ist kein Redeploy.
+Ausgewählte Unterpfade werden ausgelassen, wenn ihr übergeordneter Ordner ebenfalls ausgewählt ist. ZIPs mit gleichnamigen Wurzelelementen aus verschiedenen Ordnern werden abgelehnt. Teilfehler beim Löschen werden sichtbar angezeigt. Die vorhandene Move-API arbeitet sequenziell, nicht transaktional: bei Fehlern Quelle und Ziel auf Teiländerungen prüfen. Restore und konkurrierende JSON-Schreibzugriffe benötigen weitere Härtung.
 
-## Grenzen und Tests
+Nur vertrauenswürdiges LAN/VPN; kein vollständiger Security-/CSRF-Audit. Backend-Port abschotten. Backups vertraulich und Volume/Share zusätzlich extern sichern. MCP nutzt Bearer-Tokens und Read-only-Rechte. Telegram/optionale Vision-API können Inhalte extern übertragen; Niedrigstand-Pushwarnungen bleiben deaktiviert.
 
-Nur vertrauenswürdiges LAN/VPN, kein umfassender Security-/CSRF-Audit. Proxy-Header nur vertrauenswürdigen Proxys erlauben. Restore und konkurrierende JSON-Schreibzugriffe benötigen weitere Härtung. Backups vertraulich und Volume/Share separat sichern. Telegram und optionale Vision-API können Inhalte extern übertragen; Niedrigstand-Pushwarnungen bleiben deaktiviert. MCP nutzt separate Bearer-Tokens und Read-only-Rechte; tools/list ist maßgeblich.
+## Betrieb und Tests
 
-Python 3.12, Node.js, Abhängigkeiten aus Dockerfile plus Playwright installieren; python -m playwright install chromium und python -m unittest discover -s tests -v. Tests: Login, fünf Themes, Persistenz, Rollengrafiken und Isolation optionaler Vorschaufehler. Kein vollständiger WebGL-Renderingtest aller Dateiformate oder Nachweis für die konkrete LAN-Installation.
+Vorhandenes Compose, highfishNetwork, /share und persistentes /data verwenden. Samba auf dem Host mounten; SHARE_HOST_PATH, ADMIN_PASSWORD, stabilen SECRET_KEY und PUID/PGID setzen. Ein gespeicherter pw_hash ersetzt ADMIN_PASSWORD. Keine Volumes für Passwortprobleme löschen.
+
+Nach grünen GitHub-Tests und erfolgreichem Build Image neu ziehen, Container mit unveränderten Volumes neu erstellen und Browser hart neu laden. /build.json zeigt die Revision; data-design und data-controls sind restored-v1. Git-Push ist kein Redeploy.
+
+Python 3.12, Node.js, Dockerfile-Abhängigkeiten und Playwright installieren; python -m playwright install chromium und python -m unittest discover -s tests -v. Tests verwenden temporäre Daten für Login, Themes, Auswahl, ZIP-Inhalt, Verschieben, Papierkorb, Teilfehler, Ordner, Upload und Import. Kein vollständiger WebGL-Test oder Nachweis für die konkrete LAN-Installation.
 
 MIT: LICENSE. [Buy Me a Coffee](https://www.buymeacoffee.com/highfish)
