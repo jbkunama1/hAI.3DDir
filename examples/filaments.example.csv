@@ -1,0 +1,3 @@
+brand;material;color_name;color_hex;weight_total;weight_remaining;notes;barcode;price_per_kg;purchase_date
+Beispielmarke;PLA;Schwarz;#000000;1000;750;"Beispieldaten; keine echte Produktangabe";DEMO-0001;19.90;2026-11-01
+Beispielmarke;PETG;Weiß;#FFFFFF;1000;420.5;Angebrochene Beispielrolle;DEMO-0002;24.50;2026-11-02

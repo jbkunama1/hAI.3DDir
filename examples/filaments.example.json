@@ -1,0 +1,26 @@
+[
+  {
+    "brand": "Beispielmarke",
+    "material": "PLA",
+    "color_name": "Schwarz",
+    "color_hex": "#000000",
+    "weight_total": 1000,
+    "weight_remaining": 750,
+    "notes": "Beispieldaten; keine echte Produktangabe",
+    "barcode": "DEMO-0001",
+    "price_per_kg": 19.9,
+    "purchase_date": "2026-11-01"
+  },
+  {
+    "brand": "Beispielmarke",
+    "material": "PETG",
+    "color_name": "Weiß",
+    "color_hex": "#FFFFFF",
+    "weight_total": 1000,
+    "weight_remaining": 420.5,
+    "notes": "Angebrochene Beispielrolle",
+    "barcode": "DEMO-0002",
+    "price_per_kg": 24.5,
+    "purchase_date": "2026-11-02"
+  }
+]
