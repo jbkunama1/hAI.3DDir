@@ -20,7 +20,7 @@ def auth(h):
     if env and hmac.compare_digest(tok.encode(), env.encode()): return {"name": "env", "ro": False}
     hh, L = _h(tok), tokens()
     for t in L:
-        if hmac.compare_digest(t["hash"], hh):
+        if hmac.compare_digest(str(t.get("hash","")),hh):
             if time.time() - t.get("used", 0) > 60: t["used"] = time.time(); m.save(_tf(), L)
             return t
     return None
