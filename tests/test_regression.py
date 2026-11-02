@@ -39,6 +39,8 @@ class Regression(unittest.TestCase):
         names={x['name'] for x in result['result']['tools']}; self.assertIn('get_cost_summary',names); self.assertNotIn('write_file',names)
         self.assertNotIn(token,self.c.get('/api/mcp').text)
     def test_frontend(self):
-        source=re.search(r'<script>(.*?)</script>',Path('app/static/index.html').read_text(),re.S).group(1)
-        p=ROOT/'frontend.js'; p.write_text(source); subprocess.run(['node','--check',str(p)],check=True)
+        subprocess.run(['node','--check','app/static/app.js'],check=True)
+        html=Path('app/static/index.html').read_text()
+        self.assertIn('/app.js?v=login-v2',html)
+        ids=re.findall(r'\bid="([^"]+)"',html); self.assertEqual(len(ids),len(set(ids)))
 if __name__=='__main__': unittest.main()
