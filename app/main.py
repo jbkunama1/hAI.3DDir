@@ -13,7 +13,7 @@ EX.slicer_info=slicer_info
 ROOT = Path(os.getenv('SHARE_PATH', '/share')).resolve()
 DATA = Path(os.getenv('DATA_DIR', '/data')).resolve()
 DATA.mkdir(parents=True, exist_ok=True)
-if os.getuid() == 0:
+if hasattr(os, 'getuid') and os.getuid() == 0:
     u, g = (int(os.getenv('PUID', 1000)), int(os.getenv('PGID', 1000)))
     os.chown(DATA, u, g)
     os.setgid(g)
