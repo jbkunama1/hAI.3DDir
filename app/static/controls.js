@@ -93,10 +93,23 @@ const filBar=document.querySelector("#t-fil .bar"),exportJSON=document.createEle
 importInput.onchange=guard(async()=>{const file=importInput.files[0];if(!file)return;if(replaceInput.checked&&!confirm("Alle vorhandenen Filamentrollen durch den Import ersetzen?")){importInput.value="";return;}const body=new FormData();body.append("file",file);try{const result=await api("/filaments/import?replace="+(replaceInput.checked?1:0),{method:"POST",body});await loadFil();toast(result.imported+" Rollen importiert.");}finally{importInput.value="";}});
 let currentSort={field:"brand",dir:"asc"},currentGroup="none",currentView="list";
 const materialsSet=new Set(),brandsSet=new Set();
+
+// Delete Filament Funktion earlier definieren
+window.deleteFilament=async function(id){
+  const filament=rolls.find(r=>r.id===id);
+  if(filament&&confirm("Filamentrolle "+filament.brand+" "+filament.material+" löschen?")){
+    await api("/filaments/"+encodeURIComponent(id),{method:"DELETE"});
+    await loadFil();
+  }
+};
+
 const previousFil=loadFil;loadFil=async()=>{
   await previousFil();
   
+  // Prüfen ob Elemente existieren, bevor wir sie manipulieren
   const materials=$("#materials"),brands=$("#brands");
+  if(!materials||!brands) return;
+  
   materials.innerHTML="";
   brands.innerHTML="";
   
@@ -236,8 +249,13 @@ function createFilamentRow(filament){
     <td>${filament.material||""}</td>
     <td><span class="spool" style="--c:${filament.color_hex||"#888888"}"></span> ${filament.color_name||""}</td>
     <td>${filament.weight_remaining||0}/${filament.weight_total||0}g</td>
-    <td><button onclick="deleteFilament('${filament.id}')">Löschen</button></td>
+    <td><button data-delete="${filament.id}">Löschen</button></td>
   `;
+  
+  // Event-Handler nach dem DOM-Erstellung zuweisen
+  const deleteBtn=tr.querySelector("[data-delete]");
+  if(deleteBtn) deleteBtn.onclick=guard(async()=>window.deleteFilament(filament.id));
+  
   return tr;
 }
 function createFilamentItem(filament){
@@ -252,8 +270,13 @@ function createFilamentItem(filament){
       </div>
     </div>
     <div style="font-size:12px;margin-top:8px">${filament.weight_remaining||0}/${filament.weight_total||0}g</div>
-    <div style="margin-top:8px"><button onclick="deleteFilament('${filament.id}')" style="font-size:12px">Löschen</button></div>
+    <div style="margin-top:8px"><button data-delete="${filament.id}" style="font-size:12px">Löschen</button></div>
   `;
+  
+  // Event-Handler nach dem DOM-Erstellung zuweisen
+  const deleteBtn=div.querySelector("[data-delete]");
+  if(deleteBtn) deleteBtn.onclick=guard(async()=>window.deleteFilament(filament.id));
+  
   return div;
 }
 function createFilamentGridItem(filament){
@@ -270,18 +293,16 @@ function createFilamentGridItem(filament){
     </div>
     <div class="weight">${filament.weight_remaining||0}/${filament.weight_total||0}g</div>
     <div class="actions">
-      <button onclick="deleteFilament('${filament.id}')" style="font-size:12px">Löschen</button>
+      <button data-delete="${filament.id}" style="font-size:12px">Löschen</button>
     </div>
   `;
+  
+  // Event-Handler nach dem DOM-Erstellung zuweisen
+  const deleteBtn=div.querySelector("[data-delete]");
+  if(deleteBtn) deleteBtn.onclick=guard(async()=>window.deleteFilament(filament.id));
+  
   return div;
 }
-window.deleteFilament=async function(id){
-  const filament=rolls.find(r=>r.id===id);
-  if(filament&&confirm("Filamentrolle "+filament.brand+" "+filament.material+" löschen?")){
-    await api("/filaments/"+encodeURIComponent(id),{method:"DELETE"});
-    await loadFil();
-  }
-};
 $("fq").addEventListener("input",guard(()=>loadFil()));
 $("#fm")?.addEventListener("input",guard(()=>loadFil()));
 $("#fb")?.addEventListener("input",guard(()=>loadFil()));
@@ -289,6 +310,23 @@ $("#viewMode")?.addEventListener("change",guard(e=>{
   currentView=e.target.value;
   loadFil();
 }));
+
+// Sortierung für Table-Header
+document.querySelectorAll("#filTable th[data-sort]").forEach(th=>{ 
+  th.style.cursor="pointer";
+  th.addEventListener("click",guard((e)=>{
+    const field=e.currentTarget.dataset.sort;
+    if(currentSort.field===field){
+      currentSort.dir=currentSort.dir==="asc"?"desc":"asc";
+    }else{
+      currentSort.field=field;
+      currentSort.dir="asc";
+    }
+    // Sortier-Icon aktualisieren
+    e.currentTarget.querySelector(".sort").textContent=currentSort.dir==="asc"?"▲":"▼";
+    loadFil();
+  }));
+});
 window.addEventListener("keydown",event=>{if(event.key==="Escape"&&!document.querySelector("dialog[open]")){selected.clear();selectionMode=false;paint();}});
 document.documentElement.dataset.controls="restored-v1";decorate();
 })();
