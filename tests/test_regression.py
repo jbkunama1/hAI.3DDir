@@ -59,5 +59,5 @@ class Regression(unittest.TestCase):
                     start = max(0, match.start() - 50)
                     end = min(len(html), match.end() + 50)
                     print(f"  {dup} occurrence {i+1}: ...{html[start:end]}...")
-            self.assertEqual(len(ids),len(set(ids)))
+        self.assertEqual(len(ids),len(set(ids)))
 if __name__=='__main__': unittest.main()
