@@ -42,5 +42,10 @@ class Regression(unittest.TestCase):
         subprocess.run(['node','--check','app/static/app.js'],check=True)
         html=Path('app/static/index.html').read_text()
         self.assertIn('/app.js?v=login-v2',html)
-        ids=re.findall(r'\bid="([^"]+)"',html); self.assertEqual(len(ids),len(set(ids)))
+            ids=re.findall(r'\bid="([^"]+)"',html)
+            # Debug: Zähle IDs
+            print(f"Total IDs: {len(ids)}")
+            print(f"Unique IDs: {len(set(ids))}")
+            print("Duplicate IDs:", [id for id in set(ids) if ids.count(id) > 1])
+            self.assertEqual(len(ids),len(set(ids)))
 if __name__=='__main__': unittest.main()
