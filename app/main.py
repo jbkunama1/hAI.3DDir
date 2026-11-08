@@ -33,7 +33,7 @@ def save(f, v):
     f.write_text(json.dumps(v, ensure_ascii=False, indent=1), 'utf-8')
 
 def settings():
-    s = {'max_upload_mb': int(os.getenv('MAX_UPLOAD_MB', 500)), 'allowed_ext': os.getenv('ALLOWED_EXTENSIONS', 'stl,3mf,obj,step,stp,gcode,zip,png,jpg,pdf,txt'), 'pw_hash': None, 'trash_enabled': True, 'trash_days': 30, 'default_theme': 'modern', 'title': 'hAI.3DDir', 'thumb_max_mb': 20, 'tg_low_g': 100, 'tg_notify_start': True, 'tg_daily': True, 'tg_daily_time': '08:00', 'tg_daily_backup': False, 'tg_notify_upload': True, 'mcp_enabled': True, 'folder_view': 'links', 'sort_by': 'name', 'sort_order': 'asc', 'file_view': 'icons'}
+    s = {'max_upload_mb': int(os.getenv('MAX_UPLOAD_MB', 500)), 'allowed_ext': os.getenv('ALLOWED_EXTENSIONS', 'stl,3mf,obj,step,stp,gcode,zip,png,jpg,pdf,txt'), 'pw_hash': None, 'trash_enabled': True, 'trash_days': 30, 'default_theme': 'modern', 'title': 'hAI.3DDir', 'thumb_max_mb': 20, 'tg_low_g': 100, 'tg_notify_start': True, 'tg_daily': True, 'tg_daily_time': '08:00', 'tg_daily_backup': False, 'tg_notify_upload': True, 'mcp_enabled': True, 'folder_view': 'links', 'sort_by': 'name', 'sort_order': 'asc', 'file_view': 'icons', 'filament_view_mode': 'list', 'filament_group': 'none', 'filament_sort': 'brand', 'filament_grid_columns': 4}
     s.update(load(SF, {}))
     return s
 
@@ -227,7 +227,7 @@ def set_pw(b: PW):
     s['pw_hash'] = hpw(b.password)
     save(SF, s)
     return {'ok': True}
-KEYS = {'max_upload_mb': int, 'allowed_ext': str, 'trash_enabled': bool, 'trash_days': int, 'default_theme': str, 'title': str, 'thumb_max_mb': int, 'tg_low_g': int, 'tg_notify_start': bool, 'tg_daily': bool, 'tg_daily_time': str, 'tg_daily_backup': bool, 'tg_notify_upload': bool, 'mcp_enabled': bool, 'folder_view': str, 'sort_by': str, 'sort_order': str, 'file_view': str}
+KEYS = {'max_upload_mb': int, 'allowed_ext': str, 'trash_enabled': bool, 'trash_days': int, 'default_theme': str, 'title': str, 'thumb_max_mb': int, 'tg_low_g': int, 'tg_notify_start': bool, 'tg_daily': bool, 'tg_daily_time': str, 'tg_daily_backup': bool, 'tg_notify_upload': bool, 'mcp_enabled': bool, 'folder_view': str, 'sort_by': str, 'sort_order': str, 'file_view': str, 'filament_view_mode': str, 'filament_group': str, 'filament_sort': str, 'filament_grid_columns': int}
 
 @R.get('/settings')
 def get_settings():
@@ -246,7 +246,7 @@ def put_settings(b: dict):
 @A.get('/config')
 def config():
     s = settings()
-    return {'title': s['title'], 'default_theme': s['default_theme'], 'thumb_max_mb': s['thumb_max_mb'], 'folder_view': s['folder_view'], 'sort_by': s['sort_by'], 'sort_order': s['sort_order'], 'file_view': s['file_view']}
+    return {'title': s['title'], 'default_theme': s['default_theme'], 'thumb_max_mb': s['thumb_max_mb'], 'folder_view': s['folder_view'], 'sort_by': s['sort_by'], 'sort_order': s['sort_order'], 'file_view': s['file_view'], 'filament_view_mode': s['filament_view_mode'], 'filament_group': s['filament_group'], 'filament_sort': s['filament_sort'], 'filament_grid_columns': s['filament_grid_columns']}
 
 def norm(d):
     d = {str(k).strip().lower(): v for k, v in d.items() if k}

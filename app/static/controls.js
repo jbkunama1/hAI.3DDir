@@ -91,7 +91,204 @@ const fileSection=$("t-files");fileSection.addEventListener("dragenter",event=>{
 fileSection.addEventListener("drop",guard(async event=>{dragDepth=0;$("gr").classList.remove("drop");if(event.dataTransfer.files.length){await uploadFiles(event.dataTransfer.files);return;}const raw=event.dataTransfer.getData("application/x-hai-paths");if(!raw)return;const paths=JSON.parse(raw);if(!Array.isArray(paths)||!paths.length||paths.some(p=>typeof p!=="string"||!p))throw new Error("Ungültige Drag-and-drop-Daten");const card=event.target.closest(".card[data-path]");if(card&&card.dataset.dir!=="true")throw new Error("Zum Verschieben bitte auf einen Ordner ziehen.");await movePaths(roots(paths),card?card.dataset.path:cwd);}));
 const filBar=document.querySelector("#t-fil .bar"),exportJSON=document.createElement("a"),importInput=document.createElement("input"),replaceLabel=document.createElement("label"),replaceInput=document.createElement("input");exportJSON.textContent="JSON exportieren";exportJSON.href="/api/filaments/export?fmt=json";importInput.id="filamentImport";importInput.type="file";importInput.accept=".csv,.json";importInput.hidden=true;replaceInput.id="replaceFilaments";replaceInput.type="checkbox";replaceLabel.append(replaceInput," Bestehende Rollen beim Import ersetzen");filBar.append(exportJSON,importInput,replaceLabel);button("importFilaments","Import CSV/JSON",filBar).onclick=()=>importInput.click();
 importInput.onchange=guard(async()=>{const file=importInput.files[0];if(!file)return;if(replaceInput.checked&&!confirm("Alle vorhandenen Filamentrollen durch den Import ersetzen?")){importInput.value="";return;}const body=new FormData();body.append("file",file);try{const result=await api("/filaments/import?replace="+(replaceInput.checked?1:0),{method:"POST",body});await loadFil();toast(result.imported+" Rollen importiert.");}finally{importInput.value="";}});
-const previousFil=loadFil;loadFil=async()=>{await previousFil();const q=$("fq").value.toLowerCase(),rows=rolls.filter(r=>[r.brand,r.material,r.color_name,r.barcode].join(" ").toLowerCase().includes(q));[...$("ft").rows].forEach((tr,index)=>{const row=rows[index];if(!row)return;const b=document.createElement("button");b.type="button";b.textContent="Löschen";b.onclick=guard(async()=>{if(confirm("Filamentrolle "+row.brand+" "+row.material+" löschen?")){await api("/filaments/"+encodeURIComponent(row.id),{method:"DELETE"});await loadFil();}});tr.lastElementChild.append(b);});};
+let currentSort={field:"brand",dir:"asc"},currentGroup="none",currentView="list";
+const materialsSet=new Set(),brandsSet=new Set();
+const previousFil=loadFil;loadFil=async()=>{
+  await previousFil();
+  
+  const materials=$("#materials"),brands=$("#brands");
+  materials.innerHTML="";
+  brands.innerHTML="";
+  
+  materialsSet.add("");materialsSet.forEach(mat=>{
+    const option=document.createElement("option");
+    option.value=mat;
+    option.textContent=mat||"Alle Materialien";
+    materials.appendChild(option);
+  });
+  
+  brandsSet.add("");brandsSet.forEach(brand=>{
+    const option=document.createElement("option");
+    option.value=brand;
+    option.textContent=brand||"Alle Marken";
+    brands.appendChild(option);
+  });
+  const q=$("fq").value.toLowerCase();
+  const materialFilter=$("#fm")?.value?.toLowerCase()||"";
+  const brandFilter=$("#fb")?.value?.toLowerCase()||"";
+  
+  rolls.forEach(r=>{
+    materialsSet.add(r.material?.toLowerCase()||"");
+    brandsSet.add(r.brand?.toLowerCase()||"");
+  });
+  
+  const filtered=rolls.filter(r=>{
+    const searchText=[r.brand,r.material,r.color_name,r.barcode].join(" ").toLowerCase();
+    const searchMatch=searchText.includes(q);
+    const materialMatch=!materialFilter||r.material?.toLowerCase().includes(materialFilter);
+    const brandMatch=!brandFilter||r.brand?.toLowerCase().includes(brandFilter);
+    return searchMatch&&materialMatch&&brandMatch;
+  });
+  
+  const sorted=filtered.sort((a,b)=>{
+    let aValue=a[currentSort.field]||"",bValue=b[currentSort.field]||"";
+    if(currentSort.field==="weight_remaining"||currentSort.field==="weight_total"){
+      aValue=Number(aValue)||0;
+      bValue=Number(bValue)||0;
+    }
+    if(aValue<bValue)return currentSort.dir==="asc"?-1:1;
+    if(aValue>bValue)return currentSort.dir==="asc"?1:-1;
+    return 0;
+  });
+  
+  renderFilaments(sorted);
+};
+function renderFilaments(filaments){
+  const container=$("#filamentContent");
+  const viewMode=$("#viewMode")?.value||"list";
+  currentView=viewMode;
+  container.className=viewMode==="grid"?"grid":viewMode==="columns"?"view-mode-3":"";
+  
+  if(viewMode==="list"){
+    renderListView(filaments);
+  }else if(viewMode==="columns"){
+    renderColumnsView(filaments);
+  }else{
+    renderGridView(filaments);
+  }
+}
+function renderListView(filaments){
+  const table=$("#filTable");
+  const tbody=$("#ft");
+  table.style.display="table";
+  tbody.innerHTML="";
+  
+  if(currentGroup==="material"){
+    const groups={};
+    filaments.forEach(f=>{
+      const group=f.material||(f.brand||"Unbekannt");
+      if(!groups[group])groups[group]=[];
+      groups[group].push(f);
+    });
+    Object.entries(groups).forEach(([group,items])=>{
+      const header=createGroupHeader(group,items.length);
+      tbody.appendChild(header);
+      items.forEach(item=>tbody.appendChild(createFilamentRow(item)));
+    });
+  }else if(currentGroup==="brand"){
+    const groups={};
+    filaments.forEach(f=>{
+      const group=f.brand||(f.material||"Unbekannt");
+      if(!groups[group])groups[group]=[];
+      groups[group].push(f);
+    });
+    Object.entries(groups).forEach(([group,items])=>{
+      const header=createGroupHeader(group,items.length);
+      tbody.appendChild(header);
+      items.forEach(item=>tbody.appendChild(createFilamentRow(item)));
+    });
+  }else{
+    filaments.forEach(item=>tbody.appendChild(createFilamentRow(item)));
+  }
+}
+function renderColumnsView(filaments){
+  const table=$("#filTable");
+  table.style.display="none";
+  const container=$("#filamentContent");
+  container.innerHTML="";
+  
+  const columns=3;
+  const columnsArray=Array.from({length:columns},()=>[]);
+  
+  filaments.forEach((item,index)=>{
+    columnsArray[index%columns].push(item);
+  });
+  
+  columnsArray.forEach(column=>{
+    const columnDiv=document.createElement("div");
+    columnDiv.className="filament-column";
+    column.forEach(item=>columnDiv.appendChild(createFilamentItem(item)));
+    container.appendChild(columnDiv);
+  });
+}
+function renderGridView(filaments){
+  const table=$("#filTable");
+  table.style.display="none";
+  const container=$("#filamentContent");
+  container.innerHTML="";
+  
+  filaments.forEach(item=>{
+    const gridItem=createFilamentGridItem(item);
+    container.appendChild(gridItem);
+  });
+}
+function createGroupHeader(name,count){
+  const header=document.createElement("tr");
+  header.className="group-header-row";
+  header.innerHTML=`<td colspan="5"><span>${name} (${count})</span></td>`;
+  return header;
+}
+function createFilamentRow(filament){
+  const tr=document.createElement("tr");
+  tr.dataset.id=filament.id;
+  tr.innerHTML=`
+    <td>${filament.brand||""}</td>
+    <td>${filament.material||""}</td>
+    <td><span class="spool" style="--c:${filament.color_hex||"#888888"}"></span> ${filament.color_name||""}</td>
+    <td>${filament.weight_remaining||0}/${filament.weight_total||0}g</td>
+    <td><button onclick="deleteFilament('${filament.id}')">Löschen</button></td>
+  `;
+  return tr;
+}
+function createFilamentItem(filament){
+  const div=document.createElement("div");
+  div.className="filament-item";
+  div.innerHTML=`
+    <div style="display:flex;align-items:center;gap:12px;">
+      <span class="spool" style="--c:${filament.color_hex||"#888888"}"></span>
+      <div>
+        <div>${filament.brand||""} ${filament.material||""}</div>
+        <div style="font-size:12px;color:var(--m)">${filament.color_name||""}</div>
+      </div>
+    </div>
+    <div style="font-size:12px;margin-top:8px">${filament.weight_remaining||0}/${filament.weight_total||0}g</div>
+    <div style="margin-top:8px"><button onclick="deleteFilament('${filament.id}')" style="font-size:12px">Löschen</button></div>
+  `;
+  return div;
+}
+function createFilamentGridItem(filament){
+  const div=document.createElement("div");
+  div.className="filament-grid-item";
+  div.innerHTML=`
+    <div class="header">
+      <span class="spool" style="--c:${filament.color_hex||"#888888"}"></span>
+      <div class="info">
+        <div class="brand">${filament.brand||""}</div>
+        <div class="material">${filament.material||""}</div>
+        <div class="color">${filament.color_name||""}</div>
+      </div>
+    </div>
+    <div class="weight">${filament.weight_remaining||0}/${filament.weight_total||0}g</div>
+    <div class="actions">
+      <button onclick="deleteFilament('${filament.id}')" style="font-size:12px">Löschen</button>
+    </div>
+  `;
+  return div;
+}
+window.deleteFilament=async function(id){
+  const filament=rolls.find(r=>r.id===id);
+  if(filament&&confirm("Filamentrolle "+filament.brand+" "+filament.material+" löschen?")){
+    await api("/filaments/"+encodeURIComponent(id),{method:"DELETE"});
+    await loadFil();
+  }
+};
+$("fq").addEventListener("input",guard(()=>loadFil()));
+$("#fm")?.addEventListener("input",guard(()=>loadFil()));
+$("#fb")?.addEventListener("input",guard(()=>loadFil()));
+$("#viewMode")?.addEventListener("change",guard(e=>{
+  currentView=e.target.value;
+  loadFil();
+}));
 window.addEventListener("keydown",event=>{if(event.key==="Escape"&&!document.querySelector("dialog[open]")){selected.clear();selectionMode=false;paint();}});
 document.documentElement.dataset.controls="restored-v1";decorate();
 })();

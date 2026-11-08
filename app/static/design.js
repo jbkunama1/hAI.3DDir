@@ -54,16 +54,48 @@ loadFiles=async()=>{
 };
 // Reuse the existing form/edit handlers and add the original visual spool indicators.
 const oldFil=loadFil;
-loadFil=async()=>{await oldFil();const q=$("fq").value.toLowerCase(),filtered=rolls.filter(r=>[r.brand,r.material,r.color_name,r.barcode].join(" ").toLowerCase().includes(q));
-  [...$("ft").rows].forEach((tr,index)=>{const row=filtered[index];if(!row)return;const cell=tr.insertCell(0),spool=document.createElement("span");spool.className="spool";spool.title=row.color_name||"Filamentfarbe";spool.style.setProperty("--c",/^#[0-9a-f]{6}$/i.test(row.color_hex)?row.color_hex:"#888888");cell.append(spool);
-    if(row.image){const image=document.createElement("img");image.className="roll-photo";image.alt="Rollenfoto";image.loading="lazy";image.src="/api/filaments/"+encodeURIComponent(row.id)+"/image?v="+encodeURIComponent(row.img_ts||0);cell.append(image);}
-    const meter=document.createElement("div"),bar=document.createElement("i");meter.className="meter";bar.style.width=(row.weight_total?Math.max(0,Math.min(100,row.weight_remaining/row.weight_total*100)):0)+"%";meter.append(bar);tr.cells[4].prepend(meter);
-  });
+loadFil=async()=>{await oldFil();
+  const q=$("fq").value.toLowerCase(),filtered=rolls.filter(r=>[r.brand,r.material,r.color_name,r.barcode].join(" ").toLowerCase().includes(q));
+  
+  if(currentView==="list"){
+    const table=$("#filTable");
+    [...table.rows].forEach((tr,index)=>{
+      if(index===0)return;
+      const row=filtered[index-1];
+      if(!row)return;
+      const cell=tr.insertCell(0),spool=document.createElement("span");
+      spool.className="spool";spool.title=row.color_name||"Filamentfarbe";spool.style.setProperty("--c",/^#[0-9a-f]{6}$/i.test(row.color_hex)?row.color_hex:"#888888");
+      cell.append(spool);
+      if(row.image){const image=document.createElement("img");image.className="roll-photo";image.alt="Rollenfoto";image.loading="lazy";image.src="/api/filaments/"+encodeURIComponent(row.id)+"/image?v="+encodeURIComponent(row.img_ts||0);cell.append(image);}
+      const meter=document.createElement("div"),bar=document.createElement("i");meter.className="meter";bar.style.width=(row.weight_total?Math.max(0,Math.min(100,row.weight_remaining/row.weight_total*100)):0)+"%";meter.append(bar);tr.cells[4].prepend(meter);
+    });
+  }
 };
 const heading=document.createElement("th");heading.setAttribute("aria-label","Rollenfarbe");document.querySelector("#t-fil thead tr").prepend(heading);
 const thumbLabel=document.createElement("label");thumbLabel.textContent="3D-Thumbnails bis Dateigröße (MB; 0 = aus)";const thumbInput=document.createElement("input");thumbInput.id="a_tm";thumbInput.type="number";thumbInput.min="0";thumbLabel.append(thumbInput);$("a_view").closest("label").after(thumbLabel);settingFields.a_tm="thumb_max_mb";$("a_view").querySelector('[value="thumbs"]').textContent="3D-Thumbnails";
 const oldAdmin=loadAdm;
-loadAdm=async()=>{await oldAdmin();const stats=await api("/stats");$("as").className="st";$("as").innerHTML=[["Dateien",stats.files],["Belegt",fmt(stats.bytes)],["Frei",fmt(stats.free)],["Papierkorb",stats.trash],["Filamente",stats.filaments]].map(([label,value])=>"<div>"+label+"<b>"+esc(value)+"</b></div>").join("");};
+loadAdm=async()=>{await oldAdmin();const stats=await api("/stats");$("as").className="st";$("as").innerHTML=[["Dateien",stats.files],["Belegt",fmt(stats.bytes)],["Frei",fmt(stats.free)],["Papierkorb",stats.trash],["Filamente",stats.filaments]].map(([label,value])=>"<div>"+label+"<b>"+esc(value)+"</b></div>").join("");
+  
+  const filVm=$("#fil_vm"),filGp=$("#fil_gp"),filSort=$("#fil_sort"),filGc=$("#fil_gc");
+  if(filVm){filVm.value=CFG.filament_view_mode||"list";}
+  if(filGp){filGp.value=CFG.filament_group||"none";}
+  if(filSort){filSort.value=CFG.filament_sort||"brand";}
+  if(filGc){filGc.value=CFG.filament_grid_columns||4;}
+  
+  if(CFG.filament_view_mode)currentView=CFG.filament_view_mode;
+  if(CFG.filament_group)currentGroup=CFG.filament_group;
+  if(CFG.filament_sort)currentSort={field:CFG.filament_sort,dir:"asc"};
+  
+  document.getElementById("ff2")?.addEventListener("submit",guard(async(e)=>{
+    e.preventDefault();
+    await api("/settings",json("POST",{
+      filament_view_mode:filVm.value,
+      filament_group:filGp.value,
+      filament_sort:filSort.value,
+      filament_grid_columns:Number(filGc.value)
+    }));
+    toast("Filament-Einstellungen gespeichert.");
+  }));
 for(const button of document.querySelectorAll("nav [data-t]")){const handler=button.onclick;button.onclick=async event=>{for(const item of document.querySelectorAll("nav [data-t]"))item.classList.toggle("on",item===button);await handler(event);};}
 document.documentElement.dataset.design="restored-v1";
 if(!$("app").hidden)Promise.allSettled([loadFiles(),loadFil(),loadAdm()]);
