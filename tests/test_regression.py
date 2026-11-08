@@ -42,22 +42,22 @@ class Regression(unittest.TestCase):
         subprocess.run(['node','--check','app/static/app.js'],check=True)
         html=Path('app/static/index.html').read_text()
         self.assertIn('/app.js?v=login-v2',html)
-            ids=re.findall(r'\bid="([^"]+)"',html)
-            # Debug: Zähle IDs
-            print(f"Total IDs: {len(ids)}")
-            print(f"Unique IDs: {len(set(ids))}")
-            from collections import Counter
-            counts = Counter(ids)
-            duplicates = [id for id, count in counts.items() if count > 1]
-            print("Duplicate IDs:", duplicates)
-            if duplicates:
-                print("Locations of duplicates:")
-                for dup in duplicates:
-                    pattern = rf'id="{re.escape(dup)}"'
-                    matches = list(re.finditer(pattern, html))
-                    for i, match in enumerate(matches):
-                        start = max(0, match.start() - 50)
-                        end = min(len(html), match.end() + 50)
-                        print(f"  {dup} occurrence {i+1}: ...{html[start:end]}...")
-            self.assertEqual(len(ids),len(set(ids)))
+        ids=re.findall(r'\bid="([^"]+)"',html)
+        # Debug: Zähle IDs
+        print(f"Total IDs: {len(ids)}")
+        print(f"Unique IDs: {len(set(ids))}")
+        from collections import Counter
+        counts = Counter(ids)
+        duplicates = [id for id, count in counts.items() if count > 1]
+        print("Duplicate IDs:", duplicates)
+        if duplicates:
+            print("Locations of duplicates:")
+            for dup in duplicates:
+                pattern = rf'id="{re.escape(dup)}"'
+                matches = list(re.finditer(pattern, html))
+                for i, match in enumerate(matches):
+                    start = max(0, match.start() - 50)
+                    end = min(len(html), match.end() + 50)
+                    print(f"  {dup} occurrence {i+1}: ...{html[start:end]}...")
+        self.assertEqual(len(ids),len(set(ids)))
 if __name__=='__main__': unittest.main()
