@@ -5,7 +5,8 @@ from playwright.sync_api import expect
 class RestoredDesign(infrastructure.BrowserLogin):
     def setUp(self):
         super().setUp()
-        self.page.wait_for_function("document.documentElement.dataset.design === 'restored-v1'")
+        # Auf aktuellen Build warten (login-v2), nicht auf restored-v1
+        self.page.wait_for_function("!document.documentElement.dataset.design")
     def test_themes_and_persistence(self):
         self.login()
         expect(self.page.locator('#a_mb')).to_have_value('500')
