@@ -328,5 +328,5 @@ document.querySelectorAll("#filTable th[data-sort]").forEach(th=>{
   }));
 });
 window.addEventListener("keydown",event=>{if(event.key==="Escape"&&!document.querySelector("dialog[open]")){selected.clear();selectionMode=false;paint();}});
-document.documentElement.dataset.controls="restored-v1";decorate();
+document.documentElement.dataset.controls="login-v2";decorate();
 })();
