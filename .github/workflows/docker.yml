@@ -32,8 +32,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: pip install fastapi 'uvicorn[standard]' python-multipart itsdangerous httpx playwright
-      - run: python -m playwright install --with-deps chromium
+      - run: pip install fastapi 'uvicorn[standard]' python-multipart itsdangerous httpx
       - run: python -m compileall -q app tests
       - run: node --check app/static/app.js
       - uses: docker/setup-qemu-action@v3
