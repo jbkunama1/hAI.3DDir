@@ -1,7 +1,7 @@
 import os,re,io,subprocess,tempfile,unittest,zipfile
 from pathlib import Path
 TEMP=tempfile.TemporaryDirectory(); ROOT=Path(TEMP.name); (ROOT/'share').mkdir()
-os.environ.update(DATA_DIR=str(ROOT/'data'),SHARE_PATH=str(ROOT/'share'),ADMIN_PASSWORD='test-admin',SECRET_KEY='isolated-test-secret',TELEGRAM_BOT_TOKEN='',TELEGRAM_ALLOWED_IDS='',PUID=str(os.getuid()),PGID=str(os.getgid()),MCP_TOKEN='isolated-mcp-token')
+os.environ.update(DATA_DIR=str(ROOT/'data'),SHARE_PATH=str(ROOT/'share'),ADMIN_PASSWORD='test-admin',SECRET_KEY='isolated-test-secret',TELEGRAM_BOT_TOKEN='',TELEGRAM_ALLOWED_IDS='',PUID='1000',PGID='1000',MCP_TOKEN='isolated-mcp-token')
 from fastapi.testclient import TestClient
 from app import main as m
 class Regression(unittest.TestCase):
