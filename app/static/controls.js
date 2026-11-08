@@ -127,8 +127,8 @@ const previousFil=loadFil;loadFil=async()=>{
     brands.appendChild(option);
   });
   const q=$("fq").value.toLowerCase();
-  const materialFilter=$("#fm")?.value?.toLowerCase()||"";
-  const brandFilter=$("#fb")?.value?.toLowerCase()||"";
+  const materialFilter=$("#filMaterialFilter")?.value?.toLowerCase()||"";
+  const brandFilter=$("#filBrandFilter")?.value?.toLowerCase()||"";
   
   rolls.forEach(r=>{
     materialsSet.add(r.material?.toLowerCase()||"");
@@ -304,9 +304,9 @@ function createFilamentGridItem(filament){
   return div;
 }
 $("fq").addEventListener("input",guard(()=>loadFil()));
-$("#fm")?.addEventListener("input",guard(()=>loadFil()));
-$("#fb")?.addEventListener("input",guard(()=>loadFil()));
-$("#viewMode")?.addEventListener("change",guard(e=>{
+$("#filMaterialFilter")?.addEventListener("input",guard(()=>loadFil()));
+$("#filBrandFilter")?.addEventListener("input",guard(()=>loadFil()));
+$("#viewModeFil")?.addEventListener("change",guard(e=>{
   currentView=e.target.value;
   loadFil();
 }));
