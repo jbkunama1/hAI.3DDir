@@ -1,5 +1,5 @@
 "use strict";
-const $=id=>document.getElementById(id);
+const $=id=>document.getElementById(id.replace(/^#/,""));
 const CFG={}; let cwd="",editing=null,rolls=[];
 const esc=value=>String(value??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 function loginStatus(text,error=false){$("loginStatus").textContent=text;$("loginStatus").dataset.error=String(error);}
@@ -75,10 +75,12 @@ $("fa").onclick=()=>edit();$("fx").onclick=()=>$("fm").close();$("fq").oninput=g
 $("ff").onsubmit=guard(async()=>{const body={};for(const key of Object.keys(fields))body[key]=$("f_"+key).value;await api("/filaments"+(editing?"/"+encodeURIComponent(editing):""),json(editing?"PUT":"POST",body));$("fm").close();await loadFil();});
 const settingFields={a_ti:"title",a_th:"default_theme",a_sb:"sort_by",a_so:"sort_order",a_view:"file_view",a_mb:"max_upload_mb",a_ext:"allowed_ext",a_tr:"trash_enabled",a_td:"trash_days",a_me:"mcp_enabled"};
 async function loadAdm(){const[s,t]=await Promise.all([api("/settings"),api("/stats")]);Object.assign(CFG,s);for(const[id,key]of Object.entries(settingFields))$(id)[$(id).type==="checkbox"?"checked":"value"]=s[key];$("as").textContent=t.files+" Dateien · "+fmt(t.bytes)+" belegt · "+fmt(t.free)+" frei · "+t.filaments+" Rollen";}
+if(!$("sf").querySelector('[type="submit"]')){const save=document.createElement("button");save.type="submit";save.className="pri";save.textContent="Speichern";$("sf").append(save);}
 $("sf").onsubmit=guard(async()=>{const body={};for(const[id,key]of Object.entries(settingFields)){const el=$(id);body[key]=el.type==="checkbox"?el.checked:el.type==="number"?Number(el.value):el.value;}await api("/settings",json("PUT",body));Object.assign(CFG,body);await loadFiles();toast("Gespeichert.");});
 $("pf").onsubmit=guard(async()=>{await api("/password",json("POST",{password:$("a_pw").value}));$("a_pw").value="";await api("/logout",{method:"POST"});showLogin();loginStatus("Passwort geändert; erneut anmelden.");});
+if(!$("cc")){const clear=document.createElement("button");clear.id="cc";clear.type="button";clear.textContent="Cache leeren";$("t-adm").append(clear);}
 $("cc").onclick=guard(async()=>{await api("/cache",{method:"DELETE"});toast("Cache geleert.");});
-$("bkb").onclick=()=>$("bkr").click();$("bkr").onchange=guard(async()=>{if(!$("bkr").files[0]||!confirm("Backup einspielen? Vorhandene Daten werden überschrieben."))return;const body=new FormData();body.append("file",$("bkr").files[0]);await api("/backup/restore",{method:"POST",body});showLogin();loginStatus("Backup eingespielt; erneut anmelden.");});
+$("backupRestore").onclick=()=>$("backupFile").click();$("backupFile").onchange=guard(async()=>{if(!$("backupFile").files[0]||!confirm("Backup einspielen? Vorhandene Daten werden überschrieben."))return;const body=new FormData();body.append("file",$("backupFile").files[0]);await api("/backup/restore",{method:"POST",body});showLogin();loginStatus("Backup eingespielt; erneut anmelden.");});
 async function loadMcp(){const result=await api("/mcp");$("mt").innerHTML="";for(const token of result.tokens){const div=document.createElement("div");div.textContent=token.name+" · "+(token.ro?"nur lesen":"Vollzugriff")+" ";const button=document.createElement("button");button.type="button";button.textContent="Widerrufen";button.onclick=guard(async()=>{await api("/mcp/tokens/"+encodeURIComponent(token.id),{method:"DELETE"});await loadMcp();});div.append(button);$("mt").append(div);}}
 $("mf").onsubmit=guard(async()=>{const result=await api("/mcp/tokens",json("POST",{name:$("mn").value,ro:$("mr").checked}));$("mk").hidden=false;$("mk").textContent="Jetzt sicher kopieren (einmalig): "+result.token;await loadMcp();});
 window.addEventListener("error",()=>{if(!$("login").hidden)loginStatus("Oberflächenfehler. Bitte Build-Kennung und Browserkonsole prüfen.",true);});

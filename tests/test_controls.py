@@ -6,8 +6,9 @@ from playwright.sync_api import expect
 class RestoredControls(infrastructure.BrowserLogin):
     def setUp(self):
         super().setUp()
-        # Auf aktuellen Build warten, nicht auf restaurierten Controls
-        self.page.wait_for_function("!document.documentElement.dataset.controls")
+        # Wait for completed controls initialization, not for its absence.
+        self.page.wait_for_function("document.documentElement.dataset.controls === 'login-v2'")
+        self.assertEqual(self.errors,[])
         self.case='case-'+uuid.uuid4().hex[:10]
         self.folder=Path(self.temp.name)/'share'/self.case
         (self.folder/'destination').mkdir(parents=True)
