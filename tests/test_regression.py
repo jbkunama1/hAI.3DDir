@@ -46,6 +46,18 @@ class Regression(unittest.TestCase):
             # Debug: Zähle IDs
             print(f"Total IDs: {len(ids)}")
             print(f"Unique IDs: {len(set(ids))}")
-            print("Duplicate IDs:", [id for id in set(ids) if ids.count(id) > 1])
+            from collections import Counter
+            counts = Counter(ids)
+            duplicates = [id for id, count in counts.items() if count > 1]
+            print("Duplicate IDs:", duplicates)
+            if duplicates:
+                print("Locations of duplicates:")
+                for dup in duplicates:
+                    pattern = rf'id="{re.escape(dup)}"'
+                    matches = list(re.finditer(pattern, html))
+                    for i, match in enumerate(matches):
+                        start = max(0, match.start() - 50)
+                        end = min(len(html), match.end() + 50)
+                        print(f"  {dup} occurrence {i+1}: ...{html[start:end]}...")
             self.assertEqual(len(ids),len(set(ids)))
 if __name__=='__main__': unittest.main()
